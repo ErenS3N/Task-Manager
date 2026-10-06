@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Add Task</title>
+  </head>
+  <body>
+
+    <div class="app">
+      <header class="modal-header">
+        <h2>Add Task</h2>
+      </header>
+
+      <form id="add-form" class="form" novalidate>
+
+        <div class="field">
+          <label for="task-title">Task title <span class="required">*</span></label>
+          <input
+            type="text"
+            id="task-title"
+            name="title"
+            placeholder="What needs to be done?"
+            maxlength="120"
+            autocomplete="off"
+            required
+          />
+          <span class="field-error" id="title-error" hidden>Please enter a title.</span>
+        </div>
+
+        <div class="field">
+          <label for="task-priority">Priority</label>
+          <select id="task-priority" name="priority">
+            <option value="Low">Low</option>
+            <option value="Medium" selected>Medium</option>
+            <option value="High">High</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="task-status">Status</label>
+          <select id="task-status" name="status">
+            <option value="To Do" selected>To Do</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Done">Done</option>
+          </select>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" id="btn-cancel" class="btn-secondary">Cancel</button>
+          <button type="submit" id="btn-save" class="btn-primary">Save Task</button>
+        </div>
+
+      </form>
+
+      <!-- Shown after save in v1 to acknowledge the limitation -->
+      <div id="saved-notice" class="saved-notice" hidden>
+        <p>✓ Task saved to main.js array!</p>        
+      </div>
+    </div>
+
+  </body>
+</html>

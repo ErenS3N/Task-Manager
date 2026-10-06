@@ -1,0 +1,217 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #111318;
+  --surface:    #1c1f26;
+  --surface2:   #242830;
+  --border:     #2d3240;
+  --text:       #e2e6f0;
+  --text-muted: #6b7280;
+  --accent:     #4f7ef8;
+  --danger:     #ef4444;
+  --radius:     10px;
+  --todo:       #64748b;
+  --progress:   #f59e0b;
+  --done:       #22c55e;
+  --high:       #ef4444;
+  --medium:     #f97316;
+  --low:        #6b7280;
+}
+
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.app { display: flex; flex-direction: column; height: 100vh; }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+
+.header-left { display: flex; align-items: center; gap: 10px; }
+
+/* NEW in v3: wrap buttons so they sit together on the right */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.app-logo {
+  width: 30px; height: 30px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.app-title { font-size: 16px; font-weight: 600; }
+
+/* NEW in v3: secondary header button (Open / Save) */
+.btn-secondary {
+  -webkit-app-region: no-drag;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  transition: color .15s, background .15s;
+}
+.btn-secondary:hover { color: var(--text); background: var(--surface); }
+
+.btn-add {
+  -webkit-app-region: no-drag;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 16px;
+  transition: opacity .15s;
+}
+.btn-add:hover  { opacity: .85; }
+.btn-add:active { opacity: .7;  }
+
+.filter-bar {
+  display: flex;
+  gap: 4px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.filter-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
+  transition: all .15s;
+}
+.filter-btn:hover  { color: var(--text); background: var(--surface2); }
+.filter-btn.active { color: var(--text); background: var(--surface2); border-color: var(--border); }
+
+.task-list-area { flex: 1; overflow-y: auto; padding: 12px 18px; }
+.task-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+
+/* NEW in v3: card uses flex so action buttons sit on the far right */
+.task-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  transition: border-color .2s, background .2s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.task-card:hover { background: var(--surface2); border-color: #3d4460; }
+
+.task-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.task-title {
+  font-size: 14px;
+  font-weight: 500;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-badges { display: flex; gap: 6px; flex-shrink: 0; }
+
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: .3px;
+}
+
+.priority-high   { background: #3d1010; color: var(--high);    }
+.priority-medium { background: #3d2210; color: var(--medium);  }
+.priority-low    { background: #1e2330; color: var(--low);     }
+
+.status-todo     { background: #1e2330; color: var(--todo);     }
+.status-progress { background: #3d2e10; color: var(--progress); }
+.status-done     { background: #0d2d1a; color: var(--done);     }
+
+/* NEW in v3: inline Edit / Delete buttons — fade in on card hover */
+.task-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.task-card:hover .task-actions { opacity: 1; }
+
+.btn-action {
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  transition: opacity .15s;
+}
+.btn-edit   { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+.btn-delete { background: #3d1010;         color: var(--danger);     border: 1px solid #5a1a1a; }
+.btn-action:hover { opacity: .8; }
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.6;
+}
+.empty-state[hidden] { display: none; }
+.empty-icon { font-size: 40px; }
+
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 18px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}

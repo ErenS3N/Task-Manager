@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Edit Task</title>
+  </head>
+  <body>
+
+    <div class="app">
+      <header class="modal-header">
+        <h2>Edit Task</h2>
+      </header>
+
+      <form id="edit-form" class="form" novalidate>
+
+        <div class="field">
+          <label for="task-title">Task title <span class="required">*</span></label>
+          <input
+            type="text"
+            id="task-title"
+            name="title"
+            placeholder="What needs to be done?"
+            maxlength="120"
+            autocomplete="off"
+            required
+          />
+          <span class="field-error" id="title-error" hidden>Please enter a title.</span>
+        </div>
+
+        <div class="field">
+          <label for="task-priority">Priority</label>
+          <select id="task-priority" name="priority">
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="task-status">Status</label>
+          <select id="task-status" name="status">
+            <option value="To Do">To Do</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Done">Done</option>
+          </select>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" id="btn-cancel" class="btn-secondary">Cancel</button>
+          <button type="submit" id="btn-save"   class="btn-primary">Save Changes</button>
+        </div>
+
+      </form>
+    </div>
+
+  </body>
+</html>

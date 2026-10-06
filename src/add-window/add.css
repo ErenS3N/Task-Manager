@@ -1,0 +1,91 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #111318;
+  --surface:    #1c1f26;
+  --border:     #2d3240;
+  --text:       #e2e6f0;
+  --text-muted: #6b7280;
+  --accent:     #4f7ef8;
+  --danger:     #ef4444;
+  --radius:     8px;
+}
+
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+}
+
+.app { display: flex; flex-direction: column; height: 100vh; }
+
+.modal-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.modal-header h2 { font-size: 15px; font-weight: 600; }
+
+.form {
+  flex: 1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+label { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+.required { color: var(--danger); }
+
+input[type="text"],
+select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  padding: 9px 12px;
+  transition: border-color .15s;
+  width: 100%;
+}
+input[type="text"]::placeholder { color: var(--text-muted); }
+input[type="text"]:focus,
+select:focus { border-color: var(--accent); }
+
+.field-error { color: var(--danger); font-size: 12px; }
+
+.form-actions { display: flex; gap: 10px; margin-top: auto; }
+
+.btn-primary,
+.btn-secondary {
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px 20px;
+  flex: 1;
+  transition: opacity .15s;
+}
+.btn-primary   { background: var(--accent); color: #fff; }
+.btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.btn-primary:hover,
+.btn-secondary:hover { opacity: .85; }
+
+.saved-notice {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  text-align: center;
+}
+.saved-notice p:first-child { font-size: 16px; font-weight: 600; color: #22c55e; }
+.notice-sub { font-size: 12px; color: var(--text-muted); line-height: 1.6; }

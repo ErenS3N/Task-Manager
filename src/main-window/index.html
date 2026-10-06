@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Task Manager</title>
+  </head>
+  <body>
+
+    <div class="app">
+
+      <header class="header">
+        <div class="header-left">
+          <span class="app-logo">✓</span>
+          <h1 class="app-title">Task Manager</h1>
+        </div>
+        <div class="header-actions">
+          <!-- NEW in v3: file dialog buttons -->
+          <button id="btn-open" class="btn-secondary" title="Open tasks from file">📂 Open</button>
+          <button id="btn-save" class="btn-secondary" title="Save tasks to file">💾 Save</button>
+          <!--
+            This button CANNOT call createAddWindow() directly.
+            createAddWindow() is defined in main.js (main process).
+            The renderer has no reference to it.
+          -->
+          <button id="btn-add" class="btn-add" title="Add Task">
+            ＋ Add Task
+          </button>
+        </div>
+      </header>
+
+      <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="To Do">To Do</button>
+        <button class="filter-btn" data-filter="In Progress">In Progress</button>
+        <button class="filter-btn" data-filter="Done">Done</button>
+      </div>
+
+      <main class="task-list-area">
+        <ul id="task-list" class="task-list">
+          <!-- Tasks rendered here by renderer.js -->
+        </ul>
+
+        <div id="empty-state" class="empty-state" hidden>
+          <span class="empty-icon">📋</span>
+          <p>No tasks here.<br/>Use <strong>File → Add Task</strong></p>
+        </div>
+
+      </main>
+
+      <footer class="status-bar">
+        <span id="task-count">— tasks</span>
+        <span class="status-note">Data owned by main.js · live via IPC</span>
+      </footer>
+
+    </div>
+
+  </body>
+</html>
