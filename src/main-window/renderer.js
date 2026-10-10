@@ -6,25 +6,30 @@ const taskCount  = document.getElementById('task-count')
 const btnAdd     = document.getElementById('btn-add')
 const btnOpen    = document.getElementById('btn-open')   // NEW in v3
 const btnSave    = document.getElementById('btn-save')   // NEW in v3
+const btnClearAll = document.getElementById('btn-clear-all')
 
 const filterBtns = document.querySelectorAll('.filter-btn');
 
 console.log('Main window renderer loaded')
 
-// Module-level task array — populated over IPC (same as v2)
-const tasks = []
-
-let activeFilter = 'all';
+let activeStatusFilter = 'all';
+let activePriorityFilter = 'All';
+const hoverAnimSuppressedUntil = new Map();
+const HOVER_SUPPRESS_MS = 260;
 
 // ── Render helpers ────────────────────────────────────────────────────────────
 
 const PRIORITY_CLASS = { High: 'priority-high', Medium: 'priority-medium', Low: 'priority-low' };
 const STATUS_CLASS   = { 'To Do': 'status-todo', 'In Progress': 'status-progress', Done: 'status-done' };
 
-function renderTasks() {
-  const visible = activeFilter === 'all'
-    ? tasks
-    : tasks.filter(t => t.status === activeFilter);
+function renderTasks(allTasks) {
+  const sourceTasks = Array.isArray(allTasks) ? allTasks : [];
+
+  const visible = sourceTasks.filter((t) => {
+    const matchesStatus = activeStatusFilter === 'all' || t.status === activeStatusFilter;
+    const matchesPriority = activePriorityFilter === 'All' || t.priority === activePriorityFilter;
+    return matchesStatus && matchesPriority;
+  });
 
   taskList.innerHTML = '';
 
@@ -35,12 +40,27 @@ function renderTasks() {
     visible.forEach(task => taskList.appendChild(createTaskCard(task)));
   }
 
-  taskCount.textContent = `${tasks.length} task${tasks.length === 1 ? '' : 's'}`;
+  taskCount.textContent = `${sourceTasks.length} task${sourceTasks.length === 1 ? '' : 's'}`;
+}
+
+async function renderLatestTasks() {
+  const latestTasks = await window.taskAPI.getTasks();
+  renderTasks(latestTasks);
 }
 
 function createTaskCard(task) {
+  const statusOrder = ['To Do', 'In Progress', 'Done'];
+  const nextStatus = statusOrder[(statusOrder.indexOf(task.status) + 1) % statusOrder.length];
+  const now = Date.now();
+  const suppressUntil = hoverAnimSuppressedUntil.get(task.id) || 0;
+
   const li = document.createElement('li');
   li.className = 'task-card';
+  if (now < suppressUntil) {
+    li.classList.add('no-hover-anim');
+  } else if (suppressUntil !== 0) {
+    hoverAnimSuppressedUntil.delete(task.id);
+  }
   li.dataset.id    = task.id;
   li.dataset.title = task.title;  // NEW in v3 — used by contextmenu listener
 
@@ -53,6 +73,7 @@ function createTaskCard(task) {
       </div>
     </div>
     <div class="task-actions">
+      <button class="btn-action btn-cycle"  data-action="cycle"  data-id="${task.id}">→ ${nextStatus}</button>
       <button class="btn-action btn-edit"   data-action="edit"   data-id="${task.id}">Edit</button>
       <button class="btn-action btn-delete" data-action="delete" data-id="${task.id}">Delete</button>
     </div>
@@ -70,12 +91,22 @@ function escapeHtml(str) {
 
 // ── Filter buttons (same as v2) ───────────────────────────────────────────────
 filterBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', async () => {
     filterBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    activeFilter = btn.dataset.filter;
-    renderTasks();
+    activeStatusFilter = btn.dataset.filter;
+    await renderLatestTasks();
   });
+});
+
+window.taskAPI.onPriorityFilter(async (priority) => {
+  console.log(`[renderer] 'tasks:filter' ->`, priority);
+  activePriorityFilter = priority;
+  activeStatusFilter = 'all';
+  filterBtns.forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.filter === 'all');
+  });
+  await renderLatestTasks();
 });
 
 // ── Add Task button (same as v2) ──────────────────────────────────────────────
@@ -86,6 +117,7 @@ btnAdd.addEventListener('click', () => {
 // ── NEW in v3 — File dialog buttons ──────────────────────────────────────────
 btnOpen.addEventListener('click', () => window.taskAPI.openFile());
 btnSave.addEventListener('click', () => window.taskAPI.saveFile());
+btnClearAll.addEventListener('click', () => window.taskAPI.clearAllTasks());
 
 // ── NEW in v3 — Event delegation for Edit / Delete buttons ───────────────────
 // One listener on the parent <ul> handles clicks for ALL cards —
@@ -100,6 +132,11 @@ taskList.addEventListener('click', async (e) => {
 
   if (action === 'edit') {
     window.taskAPI.openEditWindow(taskId);
+  }
+
+  if (action === 'cycle') {
+    hoverAnimSuppressedUntil.set(taskId, Date.now() + HOVER_SUPPRESS_MS);
+    await window.taskAPI.cycleStatus(taskId);
   }
 
   if (action === 'delete') {
@@ -123,16 +160,14 @@ taskList.addEventListener('contextmenu', (e) => {
 
 // ── IPC — listen for task list updates from main (same as v2) ────────────────
 window.taskAPI.onTasksUpdated((updatedTasks) => {
-  tasks.splice(0, tasks.length, ...updatedTasks);
-  renderTasks();
+  renderTasks(updatedTasks);
 });
 
 // ── Load initial data (same as v2) ───────────────────────────────────────────
 (async () => {
   const initialTasks = await window.taskAPI.getTasks();
-  tasks.splice(0, tasks.length, ...initialTasks);
-  renderTasks();
-  console.log('[renderer] Initial tasks loaded via IPC:', tasks.length);
+  renderTasks(initialTasks);
+  console.log('[renderer] Initial tasks loaded via IPC:', initialTasks.length);
 })();
 
 console.log('[renderer] Main window renderer loaded. window.taskAPI:', window.taskAPI);

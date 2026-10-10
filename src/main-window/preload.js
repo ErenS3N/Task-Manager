@@ -30,6 +30,12 @@ contextBridge.exposeInMainWorld('taskAPI', {
   // Ask main to delete a task — includes the native confirmation dialog in main
   deleteTask: (taskId) => ipcRenderer.invoke('tasks:delete', taskId),
 
+  // Cycle task status in main: To Do -> In Progress -> Done -> To Do
+  cycleStatus: (taskId) => ipcRenderer.invoke('tasks:cycleStatus', taskId),
+
+  // Confirm and clear all tasks in main
+  clearAllTasks: () => ipcRenderer.invoke('tasks:clearAll'),
+
   // ── NEW in v3 — Context menu ──────────────────────────────────────────────
   // Renderer cannot call Menu.buildFromTemplate directly.
   // This sends the task id/title to main, which builds and pops up the menu.
@@ -39,6 +45,13 @@ contextBridge.exposeInMainWorld('taskAPI', {
   // ── NEW in v3 — File dialogs ──────────────────────────────────────────────
   openFile: () => ipcRenderer.invoke('dialog:openFile'),
   saveFile: () => ipcRenderer.invoke('dialog:saveFile'),
+
+  // Receives priority filter selection from the main process menu
+  onPriorityFilter: (callback) => {
+    const handler = (_event, priority) => callback(priority);
+    ipcRenderer.on('tasks:filter', handler);
+    return () => ipcRenderer.removeListener('tasks:filter', handler);
+  },
 
 });
 

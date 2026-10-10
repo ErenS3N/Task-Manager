@@ -80,6 +80,20 @@ html, body {
 }
 .btn-secondary:hover { color: var(--text); background: var(--surface); }
 
+.btn-danger {
+  -webkit-app-region: no-drag;
+  background: #3d1010;
+  border: 1px solid #5a1a1a;
+  border-radius: var(--radius);
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  transition: opacity .15s;
+}
+.btn-danger:hover { opacity: .85; }
+
 .btn-add {
   -webkit-app-region: no-drag;
   background: var(--accent);
@@ -134,6 +148,11 @@ html, body {
 }
 .task-card:hover { background: var(--surface2); border-color: #3d4460; }
 
+.task-card.no-hover-anim,
+.task-card.no-hover-anim .task-actions {
+  transition: none;
+}
+
 .task-main {
   display: flex;
   align-items: center;
@@ -174,11 +193,19 @@ html, body {
 .task-actions {
   display: flex;
   gap: 6px;
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
   opacity: 0;
-  transition: opacity .15s;
+  pointer-events: none;
+  transition: max-width .18s ease, opacity .12s ease;
 }
-.task-card:hover .task-actions { opacity: 1; }
+.task-card:hover .task-actions {
+  max-width: 280px;
+  opacity: 1;
+  pointer-events: auto;
+}
 
 .btn-action {
   border: none;
@@ -190,6 +217,7 @@ html, body {
   transition: opacity .15s;
 }
 .btn-edit   { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+.btn-cycle  { background: #1e2330; color: #93c5fd; border: 1px solid #334155; }
 .btn-delete { background: #3d1010;         color: var(--danger);     border: 1px solid #5a1a1a; }
 .btn-action:hover { opacity: .8; }
 

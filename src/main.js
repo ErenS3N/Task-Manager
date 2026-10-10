@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog, ipcMain, Tray, nativeImage } = require('electron')
+const { app, BrowserWindow, Menu, dialog, ipcMain, Tray, nativeImage, Notification } = require('electron')
 const path = require('node:path');
 const fs   = require('node:fs');
 
@@ -23,12 +23,86 @@ let mainWindow = null;
 let addWindow  = null;
 let editWindow = null;  // NEW in v3
 let tray       = null;  // NEW in v3 — module-scope prevents the GC footgun - GC footgun is when the tray gets garbage collected if not referenced.
+let activePriorityFilter = 'All';
 
 // ── Helper: push current task list to the main window ─────────────────────────
 function pushTasksToRenderer() {
   if (mainWindow) {
     mainWindow.webContents.send('tasks:updated', tasks);
   }
+  refreshTrayUI();
+}
+
+function getIncompleteCount() {
+  return tasks.filter(task => task.status !== 'Done').length;
+}
+
+function refreshTrayUI() {
+  if (!tray) return;
+
+  tray.setToolTip(`Task Manager - ${getIncompleteCount()} incomplete`);
+
+  const hasDoneTasks = tasks.some(task => task.status === 'Done');
+  const hasIncompleteTasks = tasks.some(task => task.status !== 'Done');
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show Tasks',
+      click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } },
+    },
+    { type: 'separator' },
+    {
+      label: 'Mark All Done',
+      enabled: hasIncompleteTasks,
+      click: async () => {
+        const confirm = await dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: 'Mark All Done',
+          message: 'Mark every task as Done?',
+          detail: 'You can still cycle statuses later if needed.',
+          buttons: ['Mark All', 'Cancel'],
+          defaultId: 1,
+          cancelId: 1,
+        });
+
+        if (confirm.response !== 0) return;
+
+        tasks.forEach(task => {
+          task.status = 'Done';
+        });
+        pushTasksToRenderer();
+      },
+    },
+    {
+      label: 'Clear Done Tasks',
+      enabled: hasDoneTasks,
+      click: async () => {
+        const confirm = await dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: 'Clear Done Tasks',
+          message: 'Remove all completed tasks?',
+          detail: 'This action cannot be undone.',
+          buttons: ['Clear Done', 'Cancel'],
+          defaultId: 1,
+          cancelId: 1,
+        });
+
+        if (confirm.response !== 0) return;
+
+        for (let i = tasks.length - 1; i >= 0; i -= 1) {
+          if (tasks[i].status === 'Done') {
+            tasks.splice(i, 1);
+          }
+        }
+
+        pushTasksToRenderer();
+      },
+    },
+    { type: 'separator' },
+    { role: 'quit' },
+  ]);
+
+  tray.setContextMenu(contextMenu);
 }
 
 // ── IPC Handlers ──────────────────────────────────────────────────────────────
@@ -79,6 +153,44 @@ ipcMain.handle('tasks:update', (_event, updated) => {
   tasks[idx] = { ...tasks[idx], ...updated };
   pushTasksToRenderer();
   return tasks[idx];
+});
+
+ipcMain.handle('tasks:cycleStatus', (_event, taskId) => {
+  const idx = tasks.findIndex(t => t.id === taskId);
+  if (idx === -1) return null;
+
+  const statusOrder = ['To Do', 'In Progress', 'Done'];
+  const currentIndex = statusOrder.indexOf(tasks[idx].status);
+  const nextIndex = (currentIndex + 1) % statusOrder.length;
+  tasks[idx].status = statusOrder[nextIndex];
+
+  if (tasks[idx].status === 'Done') {
+    new Notification({
+      title: 'Task complete',
+      body: tasks[idx].title,
+    }).show();
+  }
+
+  pushTasksToRenderer();
+  return tasks[idx];
+});
+
+ipcMain.handle('tasks:clearAll', async () => {
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    title: 'Clear All Tasks',
+    message: 'Clear every task?',
+    detail: 'This action cannot be undone.',
+    buttons: ['Clear All', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+  });
+
+  if (result.response !== 0) return false;
+
+  tasks.splice(0, tasks.length);
+  pushTasksToRenderer();
+  return true;
 });
 
 // Delete a task — after native confirmation dialog in main
@@ -271,6 +383,18 @@ function createEditWindow(taskId) {
 
 // ── App menu ──────────────────────────────────────────────────────────────────
 function buildMenu() {
+  const priorityFilterItems = ['All', 'High', 'Medium', 'Low'].map((priority) => ({
+    label: priority,
+    type: 'radio',
+    checked: priority === activePriorityFilter,
+    click: () => {
+      activePriorityFilter = priority;
+      if (mainWindow) {
+        mainWindow.webContents.send('tasks:filter', priority);
+      }
+    },
+  }));
+
   const template = [
     {
       label: 'File',
@@ -284,8 +408,6 @@ function buildMenu() {
         {
           label:       'Open Tasks…',    // NEW in v3
           accelerator: 'CmdOrCtrl+O',
-          click:       () => ipcMain.emit('dialog:openFile'),
-          // Trigger via the same IPC handler so the logic lives in one place
           click: async () => {
             const result = await dialog.showOpenDialog(mainWindow, {
               properties: ['openFile'],
@@ -323,6 +445,11 @@ function buildMenu() {
     {
       label: 'View',
       submenu: [
+        {
+          label: 'Filter by Priority',
+          submenu: priorityFilterItems,
+        },
+        { type: 'separator' },
         { role: 'reload' },
         { role: 'toggleDevTools' },
         { type: 'separator' },
@@ -359,18 +486,7 @@ function createTray() {
   const icon = nativeImage.createFromPath(iconPath);
 
   tray = new Tray(icon);           // assigned to module-scope let (not const!)
-  tray.setToolTip('Task Manager');
-
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: 'Show Tasks',
-      click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } },
-    },
-    { type: 'separator' },
-    { role: 'quit' },
-  ]);
-
-  tray.setContextMenu(contextMenu);
+  refreshTrayUI();
 
   tray.on('double-click', () => {
     if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
@@ -382,6 +498,11 @@ app.whenReady().then(() => {
   buildMenu();
   createWindow();
   createTray();   // NEW in v3
+  if (mainWindow) {
+    mainWindow.webContents.on('did-finish-load', () => {
+      mainWindow.webContents.send('tasks:filter', activePriorityFilter);
+    });
+  }
 
   // macOS: re-open the window when the Dock icon is clicked
   app.on('activate', () => {
