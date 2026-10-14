@@ -46,6 +46,9 @@ contextBridge.exposeInMainWorld('taskAPI', {
   openFile: () => ipcRenderer.invoke('dialog:openFile'),
   saveFile: () => ipcRenderer.invoke('dialog:saveFile'),
 
+  // v5 - Save the active filter setting
+  saveFilter: (filter) => ipcRenderer.send('settings:saveFilter', filter),
+
   // Receives priority filter selection from the main process menu
   onPriorityFilter: (callback) => {
     const handler = (_event, priority) => callback(priority);

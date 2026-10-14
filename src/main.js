@@ -1,6 +1,6 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, Tray, nativeImage, Notification } = require('electron')
 const path = require('node:path');
-const fs   = require('node:fs');
+const fs = require('node:fs');
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -11,19 +11,40 @@ if (require('electron-squirrel-startup')) {
 let nextId = 5;
 
 const tasks = [
-  { id: 1, title: 'Design dashboard screen',     priority: 'High',   status: 'In Progress' },
-  { id: 2, title: 'Write unit tests for API',    priority: 'Medium', status: 'To Do'       },
-  { id: 3, title: 'Update README documentation', priority: 'Low',    status: 'Done'        },
-  { id: 4, title: 'Fix login bug',               priority: 'High',   status: 'To Do'       },
+  { id: 1, title: 'Design dashboard screen', priority: 'High', status: 'In Progress' },
+  { id: 2, title: 'Write unit tests for API', priority: 'Medium', status: 'To Do' },
+  { id: 3, title: 'Update README documentation', priority: 'Low', status: 'Done' },
+  { id: 4, title: 'Fix login bug', priority: 'High', status: 'To Do' },
 ];
 
 // ── Module-scope window / tray references ─────────────────────────────────────
 // IMPORTANT: must be module-scope — a local variable would be GC'd silently.
 let mainWindow = null;
-let addWindow  = null;
+let addWindow = null;
 let editWindow = null;  // NEW in v3
-let tray       = null;  // NEW in v3 — module-scope prevents the GC footgun - GC footgun is when the tray gets garbage collected if not referenced.
+let tray = null;  // NEW in v3 — module-scope prevents the GC footgun - GC footgun is when the tray gets garbage collected if not referenced.
 let activePriorityFilter = 'All';
+
+/*** V5 update - Declare the settingsPath variable for storing the path to the settings.json file ***/
+// let settingsPath = path.join(app.getPath('userData'), 'settings.json');
+let settingsPath = null;
+
+/*** v5 update - Load and save settings functions for managing the settings.json file */
+function loadSettings() {
+  try {
+    return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+// *** V5 update - Save the settings.json file with the provided patch (updates).
+function saveSettings(patch) {
+  const current = loadSettings();
+  fs.writeFileSync(
+    settingsPath,
+    JSON.stringify({ ...current, ...patch }, null, 2)
+  );
+}
 
 // ── Helper: push current task list to the main window ─────────────────────────
 function pushTasksToRenderer() {
@@ -121,10 +142,10 @@ ipcMain.handle('window:close-add', () => { if (addWindow) addWindow.close(); });
 // Add a new task
 ipcMain.handle('tasks:add', (_event, task) => {
   const newTask = {
-    id:       nextId++,
-    title:    task.title,
+    id: nextId++,
+    title: task.title,
     priority: task.priority,
-    status:   task.status,
+    status: task.status,
   };
   tasks.push(newTask);
   pushTasksToRenderer();
@@ -200,13 +221,13 @@ ipcMain.handle('tasks:delete', async (_event, taskId) => {
 
   // dialog.showMessageBox runs in main (dialog module is main-process only)
   const result = await dialog.showMessageBox(mainWindow, {
-    type:      'warning',
-    title:     'Delete Task',
-    message:   `Delete "${task.title}"?`,
-    detail:    'This action cannot be undone.',
-    buttons:   ['Delete', 'Cancel'],
+    type: 'warning',
+    title: 'Delete Task',
+    message: `Delete "${task.title}"?`,
+    detail: 'This action cannot be undone.',
+    buttons: ['Delete', 'Cancel'],
     defaultId: 1,   // Cancel is the safe default — Enter key triggers it
-    cancelId:  1,   // Esc key also maps to Cancel
+    cancelId: 1,   // Esc key also maps to Cancel
   });
 
   if (result.response !== 0) return false;   // 0 = Delete button
@@ -233,13 +254,13 @@ ipcMain.handle('menu:showTaskContext', (_event, taskId, taskTitle) => {
       label: `Delete "${taskTitle}"`,
       click: async () => {
         const result = await dialog.showMessageBox(mainWindow, {
-          type:      'warning',
-          title:     'Delete Task',
-          message:   `Delete "${taskTitle}"?`,
-          detail:    'This action cannot be undone.',
-          buttons:   ['Delete', 'Cancel'],
+          type: 'warning',
+          title: 'Delete Task',
+          message: `Delete "${taskTitle}"?`,
+          detail: 'This action cannot be undone.',
+          buttons: ['Delete', 'Cancel'],
           defaultId: 1,
-          cancelId:  1,
+          cancelId: 1,
         });
         if (result.response === 0) {
           const idx = tasks.findIndex(t => t.id === taskId);
@@ -298,22 +319,50 @@ ipcMain.handle('dialog:saveFile', async () => {
   }
 });
 
+ipcMain.on('settings:saveFilter', (event, filter) => {
+  saveSettings({ activeFilter: filter }())
+})
+
+let saved = {};
+
 // ── Window creation ───────────────────────────────────────────────────────────
 
 const createWindow = () => {
   mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: saved.width || 800, // *** v5 update - use saved width if available, otherwise default to 800
+    height: saved.height || 600, // *** v5 update - use saved height if available, otherwise default to 600
+    x: saved.x, // *** v5 update - undefined = OS places the window
+    y: saved.y, // *** v5 update
     title: 'Task Manager',
     icon: path.join(app.getAppPath(), 'assets', 'icon.png'), //<a href="https://www.flaticon.com/free-icons/execution" title="execution icons">Execution icons created by kliwir art - Flaticon</a>
     webPreferences: {
       contextIsolation: true,
-      nodeIntegration:  false,
+      nodeIntegration: false,
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
   });
 
+  //***v5 update - save window state on resize and move */
+  function saveWindowState() {
+    if (!mainWindow || mainWindow.isMinimized()) return;
+    const { x, y, width, height } = mainWindow.getBounds();
+    saveSettings({ windowState: { x, y, width, height } });
+  }
+
+  /***v5 update:agttach saveWindowState to events */
+  mainWindow.on('resize', saveWindowState);
+  mainWindow.on('move', saveWindowState);
+
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    pushTasksToRenderer();
+    // Push saved filter to renderer
+    const settings = loadSettings();
+    if (settings.activeFilter) {
+      mainWindow.webContents.send('tasks:filter', settings.activeFilter);
+    }
+  });
 
   // NEW in v3: 'close' fires BEFORE the window closes — we can cancel it
   // and hide to tray instead of quitting.
@@ -334,18 +383,18 @@ function createAddWindow() {
   if (addWindow) { addWindow.focus(); return; }
 
   addWindow = new BrowserWindow({
-    width:       440,
-    height:      380,
-    parent:      mainWindow,
-    modal:       true,
-    title:       'Add Task',
-    icon: path.join(app.getAppPath(), 'assets', 'icon.png'), 
-    resizable:   false,
+    width: 440,
+    height: 380,
+    parent: mainWindow,
+    modal: true,
+    title: 'Add Task',
+    icon: path.join(app.getAppPath(), 'assets', 'icon.png'),
+    resizable: false,
     minimizable: false,
     maximizable: false,
     webPreferences: {
       contextIsolation: true,
-      nodeIntegration:  false,
+      nodeIntegration: false,
       preload: ADD_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
   });
@@ -362,11 +411,11 @@ function createEditWindow(taskId) {
     width: 440, height: 380,
     parent: mainWindow, modal: true,
     title: 'Edit Task',
-    icon: path.join(app.getAppPath(), 'assets', 'icon.png'), 
+    icon: path.join(app.getAppPath(), 'assets', 'icon.png'),
     resizable: false, minimizable: false, maximizable: false,
     webPreferences: {
       contextIsolation: true,
-      nodeIntegration:  false,
+      nodeIntegration: false,
       preload: EDIT_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
   });
@@ -400,13 +449,13 @@ function buildMenu() {
       label: 'File',
       submenu: [
         {
-          label:       'Add Task',
+          label: 'Add Task',
           accelerator: 'CmdOrCtrl+N',
-          click:       () => createAddWindow(),
+          click: () => createAddWindow(),
         },
         { type: 'separator' },
         {
-          label:       'Open Tasks…',    // NEW in v3
+          label: 'Open Tasks…',    // NEW in v3
           accelerator: 'CmdOrCtrl+O',
           click: async () => {
             const result = await dialog.showOpenDialog(mainWindow, {
@@ -427,7 +476,7 @@ function buildMenu() {
           },
         },
         {
-          label:       'Save Tasks…',    // NEW in v3
+          label: 'Save Tasks…',    // NEW in v3
           accelerator: 'CmdOrCtrl+S',
           click: async () => {
             const result = await dialog.showSaveDialog(mainWindow, {
@@ -495,6 +544,14 @@ function createTray() {
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
+  /*** v5 update -> assign settingsPath here, after the app is ready.
+  app.getPath('userData') is only safe to call after whenReady() resolves. ***/
+  settingsPath = path.join(app.getPath('userData'), 'settings.json');
+  console.log('settings path', settingsPath);
+
+  // *** v5 update - get the saved window state or default to an empty object
+  saved = loadSettings().windowState || {};
+
   buildMenu();
   createWindow();
   createTray();   // NEW in v3
@@ -512,6 +569,9 @@ app.whenReady().then(() => {
       mainWindow.show();
     }
   });
+
+  saveSettings({ test: true }); // v4 test 2
+  console.log(loadSettings()); // v4  test 1
 });
 
 // Windows / Linux: quit when the last window closes.
