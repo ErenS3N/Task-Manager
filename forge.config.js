@@ -4,27 +4,34 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
-    icon: './assets/icon',   // NEW in v3: tray icon (Forge appends .ico/.icns/.png)
-  },
+    icon: './assets/icons/icon',    
+    extraResource: [
+      './assets/icon.png'
+    ],
+  },  
   rebuildConfig: {},
   makers: [
-    {
-      name: '@electron-forge/maker-squirrel',
-      config: {},
+  {
+    name: '@electron-forge/maker-squirrel',
+    config: {
+      name: 'TaskManager',
+      setupExe: 'TaskManagerSetup.exe',
+      setupIcon: './assets/icons/icon.ico',
     },
-    {
-      name: '@electron-forge/maker-zip',
-      platforms: ['darwin'],
-    },
-    {
-      name: '@electron-forge/maker-deb',
-      config: {},
-    },
-    {
-      name: '@electron-forge/maker-rpm',
-      config: {},
-    },
-  ],
+  },
+  {
+    name: '@electron-forge/maker-zip',
+    platforms: ['darwin'],
+  },
+  {
+    name: '@electron-forge/maker-deb',
+    config: {},
+  },
+  {
+    name: '@electron-forge/maker-rpm',
+    config: {},
+  },
+],
   plugins: [
     {
       name: '@electron-forge/plugin-auto-unpack-natives',
@@ -67,8 +74,8 @@ module.exports = {
       [FuseV1Options.EnableCookieEncryption]: true,
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
       [FuseV1Options.EnableNodeCliInspectArguments]: false,
-      [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
-      [FuseV1Options.OnlyLoadAppFromAsar]: true,
+      [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: false,
+      [FuseV1Options.OnlyLoadAppFromAsar]: false,
     }),
   ],
 };
