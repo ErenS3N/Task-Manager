@@ -29,6 +29,7 @@ let activePriorityFilter = 'All';
 // let settingsPath = path.join(app.getPath('userData'), 'settings.json');
 let settingsPath = null;
 const validStatusFilters = new Set(['all', 'To Do', 'In Progress', 'Done']);
+const validStatusFilters = new Set(['all', 'To Do', 'In Progress', 'Done']);
 
 /*** v5 update - Load and save settings functions for managing the settings.json file */
 function loadSettings() {
@@ -174,6 +175,15 @@ function sanitiseTasks(parsed) {
 
 // Add a new task
 ipcMain.handle('tasks:add', (_event, task) => {
+  // Validate the task object before adding it
+  if (typeof task.title !== 'string' // Title must be a string  
+      || task.title.trim().length === 0 // Title cannot be empty
+      || task.title.length > 120 // Maximum title length is 120 characters
+      || !VALID_PRIORITY.includes(task.priority) // Priority must be one of the valid options
+      || !VALID_STATUS.includes(task.status))// Status must be one of the valid options
+    return null
+  
+  // Create a new task object with validated properties
   // Validate the task object before adding it
   if (typeof task.title !== 'string' // Title must be a string  
       || task.title.trim().length === 0 // Title cannot be empty
@@ -389,6 +399,10 @@ ipcMain.on('settings:saveFilter', (_event, filter) => {
   if (!validStatusFilters.has(filter)) return;
   saveSettings({ activeFilter: filter });
 });
+ipcMain.on('settings:saveFilter', (_event, filter) => {
+  if (!validStatusFilters.has(filter)) return;
+  saveSettings({ activeFilter: filter });
+});
 
 let saved = {};
 
@@ -405,6 +419,7 @@ const createWindow = () => {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
       sandbox: true,
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
@@ -426,7 +441,10 @@ const createWindow = () => {
   mainWindow.webContents.on('did-finish-load', () => {
     pushTasksToRenderer();
     mainWindow.webContents.send('tasks:filter', activePriorityFilter);
+    mainWindow.webContents.send('tasks:filter', activePriorityFilter);
     const settings = loadSettings();
+    if (validStatusFilters.has(settings.activeFilter)) {
+      mainWindow.webContents.send('tasks:restoreFilter', settings.activeFilter);
     if (validStatusFilters.has(settings.activeFilter)) {
       mainWindow.webContents.send('tasks:restoreFilter', settings.activeFilter);
     }
@@ -464,6 +482,7 @@ function createAddWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      sandbox: true,
       preload: ADD_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
   });
@@ -485,6 +504,7 @@ function createEditWindow(taskId) {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
       sandbox: true,
       preload: EDIT_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
@@ -571,6 +591,10 @@ function buildMenu() {
         },
         { type: 'separator' },
         { role: 'reload' },
+        { 
+          role: 'toggleDevTools', 
+          visible: !app.isPackaged 
+        },
         { 
           role: 'toggleDevTools', 
           visible: !app.isPackaged 
