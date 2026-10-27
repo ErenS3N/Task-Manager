@@ -2,6 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- <meta
+          http-equiv="Content-Security-Policy"
+          content="default-src 'self';
+          script-src 'self';
+          style-src 'self' 'unsafe-inline';"
+    /> -->
+    <meta
+          http-equiv="Content-Security-Policy"
+          content="default-src 'self';
+          script-src 'self' 'unsafe-eval';
+          style-src 'self' 'unsafe-inline';"
+    />
     <title>Add Task</title>
   </head>
   <body>
@@ -11,7 +23,7 @@
         <h2>Add Task</h2>
       </header>
 
-      <form id="add-form" class="form" novalidate>
+      <form id="add-form" class="form">
 
         <div class="field">
           <label for="task-title">Task title <span class="required">*</span></label>
@@ -29,7 +41,7 @@
 
         <div class="field">
           <label for="task-priority">Priority</label>
-          <select id="task-priority" name="priority">
+          <select id="task-priority" name="priority" required>
             <option value="Low">Low</option>
             <option value="Medium" selected>Medium</option>
             <option value="High">High</option>
@@ -38,7 +50,7 @@
 
         <div class="field">
           <label for="task-status">Status</label>
-          <select id="task-status" name="status">
+          <select id="task-status" name="status" required>
             <option value="To Do" selected>To Do</option>
             <option value="In Progress">In Progress</option>
             <option value="Done">Done</option>

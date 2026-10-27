@@ -32,7 +32,7 @@ form.addEventListener('submit', async(e) => {
  
   try {
     // Send the task to main.js — invoke returns the saved task object
-    const saved = await window.taskAPI.addTask({ title, priority, status });// we need await because addTask is asynchronous
+    await window.taskAPI.addTask({ title, priority, status });
     // console.log('[add-window] Task saved:', saved);
  
     // Show the success state only after main confirms the task was saved.

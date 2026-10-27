@@ -28,6 +28,7 @@ let activePriorityFilter = 'All';
 /*** V5 update - Declare the settingsPath variable for storing the path to the settings.json file ***/
 // let settingsPath = path.join(app.getPath('userData'), 'settings.json');
 let settingsPath = null;
+const validStatusFilters = new Set(['all', 'To Do', 'In Progress', 'Done']);
 
 /*** v5 update - Load and save settings functions for managing the settings.json file */
 function loadSettings() {
@@ -139,8 +140,49 @@ ipcMain.handle('window:open-add', () => { createAddWindow(); });
 // Close the add window
 ipcMain.handle('window:close-add', () => { if (addWindow) addWindow.close(); });
 
+// Validation constants for task properties
+const VALID_PRIORITY = ['Low', 'Medium', 'High']
+const VALID_STATUS = ['To Do','In Progress','Done']
+
+// Verfies tasks json files match the approved fields
+function sanitiseTasks(parsed) {
+  if (!Array.isArray(parsed)) {
+    throw new Error('The task file must contain a list of tasks.');
+  }
+
+  const seenIds = new Set();
+
+  return parsed.map(task => {
+    if (!task || typeof task !== 'object' || Array.isArray(task)) {
+      throw new Error('Each task must be an object.');
+    }
+
+    const id = Number(task.id);
+    if (!Number.isSafeInteger(id) || id <= 0 || seenIds.has(id)) {
+      throw new Error('Each task must have a unique positive whole-number ID.');
+    }
+    seenIds.add(id);
+
+    return {
+      id,
+      title: String(task.title).slice(0, 120),
+      priority: VALID_PRIORITY.includes(task.priority) ? task.priority : 'Low',
+      status: VALID_STATUS.includes(task.status) ? task.status : 'To Do',
+    };
+  });
+}
+
 // Add a new task
 ipcMain.handle('tasks:add', (_event, task) => {
+  // Validate the task object before adding it
+  if (typeof task.title !== 'string' // Title must be a string
+      || task.title.trim().length === 0 // Title cannot be empty
+      || task.title.length > 120 // Maximum title length is 120 characters
+      || !VALID_PRIORITY.includes(task.priority) // Priority must be one of the valid options
+      || !VALID_STATUS.includes(task.status))// Status must be one of the valid options
+    return null
+
+  // Create a new task object with validated properties
   const newTask = {
     id: nextId++,
     title: task.title,
@@ -169,14 +211,35 @@ ipcMain.handle('tasks:getOne', (_event, taskId) => {
 
 // Save edits to an existing task
 ipcMain.handle('tasks:update', (_event, updated) => {
+  if (!updated
+    || typeof updated !== 'object'
+    || !Number.isInteger(updated.id)
+    || updated.id <= 0
+    || typeof updated.title !== 'string'
+    || updated.title.trim().length === 0
+    || updated.title.length > 120
+    || !VALID_PRIORITY.includes(updated.priority)
+    || !VALID_STATUS.includes(updated.status)
+  ) {
+    return null;
+  }
+
   const idx = tasks.findIndex(t => t.id === updated.id);
   if (idx === -1) return null;
-  tasks[idx] = { ...tasks[idx], ...updated };
+
+  tasks[idx] = {
+    id: updated.id,
+    title: updated.title,
+    priority: updated.priority,
+    status: updated.status,
+  };
+
   pushTasksToRenderer();
   return tasks[idx];
 });
 
 ipcMain.handle('tasks:cycleStatus', (_event, taskId) => {
+  if (!Number.isInteger(taskId) || taskId <= 0) return null;
   const idx = tasks.findIndex(t => t.id === taskId);
   if (idx === -1) return null;
 
@@ -188,7 +251,7 @@ ipcMain.handle('tasks:cycleStatus', (_event, taskId) => {
   if (tasks[idx].status === 'Done') {
     new Notification({
       title: 'Task complete',
-      body: tasks[idx].title,
+      body: tasks[idx].title.slice(0, 80),
     }).show();
   }
 
@@ -216,6 +279,7 @@ ipcMain.handle('tasks:clearAll', async () => {
 
 // Delete a task — after native confirmation dialog in main
 ipcMain.handle('tasks:delete', async (_event, taskId) => {
+  if (!Number.isInteger(taskId) || taskId <= 0) return false;
   const task = tasks.find(t => t.id === taskId);
   if (!task) return false;
 
@@ -233,6 +297,7 @@ ipcMain.handle('tasks:delete', async (_event, taskId) => {
   if (result.response !== 0) return false;   // 0 = Delete button
 
   const idx = tasks.findIndex(t => t.id === taskId);
+  if (idx === -1) return false;
   tasks.splice(idx, 1);
   pushTasksToRenderer();
   return true;
@@ -289,7 +354,8 @@ ipcMain.handle('dialog:openFile', async () => {
   if (result.canceled || result.filePaths.length === 0) return false;
   try {
     const loaded = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'));
-    tasks.splice(0, tasks.length, ...loaded);
+    const clean = sanitiseTasks(loaded);
+    tasks.splice(0, tasks.length, ...clean);
     nextId = Math.max(...tasks.map(t => t.id), 0) + 1;
     pushTasksToRenderer();
     return true;
@@ -319,9 +385,10 @@ ipcMain.handle('dialog:saveFile', async () => {
   }
 });
 
-ipcMain.on('settings:saveFilter', (event, filter) => {
-  saveSettings({ activeFilter: filter }())
-})
+ipcMain.on('settings:saveFilter', (_event, filter) => {
+  if (!validStatusFilters.has(filter)) return;
+  saveSettings({ activeFilter: filter });
+});
 
 let saved = {};
 
@@ -338,6 +405,7 @@ const createWindow = () => {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
   });
@@ -357,10 +425,11 @@ const createWindow = () => {
 
   mainWindow.webContents.on('did-finish-load', () => {
     pushTasksToRenderer();
-    // Push saved filter to renderer
+    mainWindow.webContents.send('tasks:filter', activePriorityFilter);
+
     const settings = loadSettings();
-    if (settings.activeFilter) {
-      mainWindow.webContents.send('tasks:filter', settings.activeFilter);
+    if (validStatusFilters.has(settings.activeFilter)) {
+      mainWindow.webContents.send('tasks:restoreFilter', settings.activeFilter);
     }
   });
 
@@ -395,6 +464,7 @@ function createAddWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
       preload: ADD_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
   });
@@ -416,6 +486,7 @@ function createEditWindow(taskId) {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
       preload: EDIT_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
   });
@@ -465,7 +536,8 @@ function buildMenu() {
             if (result.canceled || result.filePaths.length === 0) return;
             try {
               const loaded = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'));
-              tasks.splice(0, tasks.length, ...loaded);
+              const clean = sanitiseTasks(loaded);
+              tasks.splice(0, tasks.length, ...clean);
               nextId = Math.max(...tasks.map(t => t.id), 0) + 1;
               pushTasksToRenderer();
             } catch (err) {
@@ -500,7 +572,10 @@ function buildMenu() {
         },
         { type: 'separator' },
         { role: 'reload' },
-        { role: 'toggleDevTools' },
+        {
+          role: 'toggleDevTools',
+          visible: !app.isPackaged
+        },
         { type: 'separator' },
         { role: 'resetZoom' },
         { role: 'zoomIn' },
@@ -555,11 +630,6 @@ app.whenReady().then(() => {
   buildMenu();
   createWindow();
   createTray();   // NEW in v3
-  if (mainWindow) {
-    mainWindow.webContents.on('did-finish-load', () => {
-      mainWindow.webContents.send('tasks:filter', activePriorityFilter);
-    });
-  }
 
   // macOS: re-open the window when the Dock icon is clicked
   app.on('activate', () => {
