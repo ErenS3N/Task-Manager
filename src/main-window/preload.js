@@ -56,6 +56,12 @@ contextBridge.exposeInMainWorld('taskAPI', {
     return () => ipcRenderer.removeListener('tasks:filter', handler);
   },
 
+  onStatusFilterRestored: (callback) => {
+    const handler = (_event, filter) => callback(filter);
+    ipcRenderer.on('tasks:restoreFilter', handler);
+    return () => ipcRenderer.removeListener('tasks:restoreFilter', handler);
+  },
+
 });
 
 console.log('[preload] Main window — taskAPI exposed via contextBridge.');

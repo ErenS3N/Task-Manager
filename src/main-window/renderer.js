@@ -95,6 +95,7 @@ filterBtns.forEach(btn => {
     filterBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     activeStatusFilter = btn.dataset.filter;
+    window.taskAPI.saveFilter(activeStatusFilter);
     await renderLatestTasks();
   });
 });
@@ -105,6 +106,14 @@ window.taskAPI.onPriorityFilter(async (priority) => {
   activeStatusFilter = 'all';
   filterBtns.forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.filter === 'all');
+  });
+  await renderLatestTasks();
+});
+
+window.taskAPI.onStatusFilterRestored(async (filter) => {
+  activeStatusFilter = filter;
+  filterBtns.forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.filter === filter);
   });
   await renderLatestTasks();
 });
