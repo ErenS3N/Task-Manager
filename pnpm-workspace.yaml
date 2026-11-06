@@ -1,7 +1,5 @@
 # Node modules layout required by Electron Forge
 nodeLinker: hoisted
-# Block lifecycle scripts by default
-ignoreScripts: true
 # Delay installs of packages < 24 hours old
 minimumReleaseAge: 1440
 # Block trust regressions
@@ -10,10 +8,10 @@ trustPolicy: no-downgrade
 # @electron/node-gyp uses a GitHub tarball
 blockExoticSubdeps: false
 # Build script allow-list (pnpm 12 uses a map)
-# onlyBuiltDependencies was removed in pnpm 11
 allowBuilds:
   electron: true
   "@electron/rebuild": true
+  electron-winstaller: true
 # Force patched versions for known toolchain
 # vulnerabilities in @electron-forge
 overrides:
