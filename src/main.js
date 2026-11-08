@@ -22,6 +22,7 @@ const tasks = [
 let mainWindow = null;
 let addWindow = null;
 let editWindow = null;  // NEW in v3
+let detailWindow = null;
 let tray = null;  // NEW in v3 — module-scope prevents the GC footgun - GC footgun is when the tray gets garbage collected if not referenced.
 let activePriorityFilter = 'All';
 
@@ -238,6 +239,10 @@ ipcMain.handle('window:close-edit', () => { if (editWindow) editWindow.close(); 
 // Return a single task by id (used by the edit window to pre-fill the form)
 ipcMain.handle('tasks:getOne', (_event, taskId) => {
   return tasks.find(t => t.id === taskId) || null;
+});
+
+ipcMain.handle('window:open-detail', (_event, taskId) => {
+  createDetailWindow(taskId);
 });
 
 // Gives the detail window a dedicated IPC request by task ID and returns the full object
@@ -544,6 +549,38 @@ function createEditWindow(taskId) {
   });
 
   editWindow.on('closed', () => { editWindow = null; });
+}
+
+function createDetailWindow(taskId) {
+  if (!Number.isInteger(taskId) || taskId <= 0) return;
+  if (!tasks.some(task => task.id === taskId)) return;
+
+  const detailUrl = new URL(DETAIL_WINDOW_WEBPACK_ENTRY);
+  detailUrl.searchParams.set('taskId', String(taskId));
+
+  if (detailWindow) {
+    detailWindow.loadURL(detailUrl.toString());
+    detailWindow.focus();
+    return;
+  }
+
+  detailWindow = new BrowserWindow({
+    width: 520,
+    height: 600,
+    parent: mainWindow,
+    modal: false,
+    title: 'Task Detail',
+    icon: path.join(app.getAppPath(), 'assets', 'icon.png'),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      preload: DETAIL_WINDOW_PRELOAD_WEBPACK_ENTRY,
+    },
+  });
+
+  detailWindow.on('closed', () => { detailWindow = null; });
+  detailWindow.loadURL(detailUrl.toString());
 }
 
 // ── App menu ──────────────────────────────────────────────────────────────────
