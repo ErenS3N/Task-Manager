@@ -1,0 +1,67 @@
+name: Publish Windows Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify the release tag matches package.json
+        shell: pwsh
+        run: |
+          $packageVersion = node -p "require('./package.json').version"
+          if ($env:GITHUB_REF_NAME -ne "v$packageVersion") {
+            throw "Tag $env:GITHUB_REF_NAME must match package version v$packageVersion"
+          }
+
+      - run: pnpm make
+
+      - name: Publish Squirrel.Windows assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $artifactDirectory = "out/make/squirrel.windows/x64"
+          $releaseFiles = Get-ChildItem -Path $artifactDirectory -File
+          $packageVersion = node -p "require('./package.json').version"
+          $requiredFiles = @(
+            "RELEASES",
+            "TaskManagerSetup.exe",
+            "TaskManager-$packageVersion-full.nupkg"
+          )
+
+          foreach ($fileName in $requiredFiles) {
+            if (-not (Test-Path (Join-Path $artifactDirectory $fileName))) {
+              throw "Required update asset is missing: $fileName"
+            }
+          }
+
+          $releaseArguments = @(
+            "release"
+            "create"
+            $env:GITHUB_REF_NAME
+            "--title"
+            "Task Manager $env:GITHUB_REF_NAME"
+            "--generate-notes"
+          ) + @($releaseFiles | ForEach-Object { $_.FullName })
+
+          & gh @releaseArguments

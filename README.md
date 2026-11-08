@@ -46,6 +46,18 @@ pnpm make
 
 Build artifacts are written to the `out` directory.
 
+## Publish a Windows release
+
+1. Update the `version` in `package.json`.
+2. Push a matching version tag, such as `v3.0.1`:
+
+   ```bash
+   git tag v3.0.1
+   git push origin v3.0.1
+   ```
+
+The `Publish Windows Release` workflow builds the Squirrel.Windows installer and publishes `RELEASES`, the full `.nupkg`, and the setup `.exe` to a GitHub Release. The tag must match the package version. The updater is configured for this repository, which must be public for `update.electronjs.org` to serve updates; draft and prerelease releases are not update targets.
+
 ## Available scripts
 
 | Command | Description |

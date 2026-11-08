@@ -1,5 +1,7 @@
 # Process Log
 
+- **Part 1 - Task Detail Window**
+
 - **Step 1 - Task metadata:** Added task metadata for Notes, creation time, and last-updated time, with validation when task data is loaded. The metadata is available to the task and Detail views.
 
 - **Step 2 - Detail window:** Added and registered a dedicated Task Detail window, renderer, and preload. The main process supplies task details; a manual check confirmed the Detail window opens separately and leaves the main window usable.
@@ -18,6 +20,12 @@
 
 - **Window dimension persistence:** Centralized Add, Edit, and Detail saves on resize and close, and added a Main-window snapshot before its close-to-tray handler. Existing settings already contained saved dimensions; the additional event coverage ensures the latest bounds are recorded. Diagnostics found no errors; packaging was not run while the app was open.
 
-- **Part 2 - Updater research:** Added `update-electron-app` as the updater dependency. Confirmed its GitHub update service requires a public repository and GitHub Releases; Windows releases must include the Squirrel `RELEASES` manifest and full `.nupkg`. The configured course remote is not publicly accessible, so the app will need a public release repository for live update checks.
-- **Part 2 - Main-process update flow:** Added packaged Windows/macOS launch checks through `update-electron-app`, disabled its built-in dialog, and bridged update-available/downloaded state plus a guarded restart-and-install request through the main-window preload. Update state is retained and sent after renderer load. The configured feed currently targets the course GitHub repository and requires public release assets to function.
-- **Part 2 - Renderer update notices:** Added a live status banner for an available update, a ready-to-install notice, and a Restart and Install button shown only after download completion. The button requests the guarded main-process install action. Renderer diagnostics found no errors, and `pnpm package` passed.
+**Part 2 - Auto Update**
+
+- **Updater research:** Added `update-electron-app` as the updater dependency. Confirmed its GitHub update service requires a public repository and GitHub Releases; Windows releases must include the Squirrel `RELEASES` manifest and full `.nupkg`. The configured course remote is not publicly accessible, so the app will need a public release repository for live update checks.
+
+- **Main-process update flow:** Added packaged Windows launch checks through `update-electron-app`, disabled its built-in dialog, and bridged update-available/downloaded state plus a guarded restart-and-install request through the main-window preload. Update state is retained and sent after renderer load. The configured feed currently targets the course GitHub repository and requires public release assets to function.
+
+- **Renderer update notices:** Added a live status banner for an available update, a ready-to-install notice, and a Restart and Install button shown only after download completion. The button requests the guarded main-process install action. Renderer diagnostics found no errors, and `pnpm package` passed.
+
+- **GitHub Releases publishing:** Added a Windows GitHub Actions workflow triggered by matching `vX.Y.Z` tags. It builds and publishes the Squirrel `RELEASES`, full `.nupkg`, and setup `.exe` assets; documented the version-tag workflow and public-repository requirement. `pnpm make` generated all three expected assets. The updater check is Windows-only to match the published artifacts. Used GitHub Actions' `gh` CLI instead of adding the Forge GitHub publisher because pnpm's supply-chain policy rejected its transitive `@octokit/endpoint@9.0.6` dependency.

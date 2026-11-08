@@ -770,7 +770,7 @@ app.whenReady().then(() => {
   createWindow();
   createTray();   // NEW in v3
 
-  if (app.isPackaged && ['win32', 'darwin'].includes(process.platform)) {
+  if (app.isPackaged && process.platform === 'win32') {
     updateElectronApp({
       updateSource: {
         type: UpdateSourceType.ElectronPublicUpdateService,
