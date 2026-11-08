@@ -22,11 +22,12 @@ html, body {
 .app { display: flex; flex-direction: column; height: 100vh; }
 
 .modal-header {
-  padding: 16px 20px 12px;
+  height: 60px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.modal-header h2 { font-size: 15px; font-weight: 600; }
+.modal-header h2 { font-size: 16px; font-weight: 600; line-height: 30px; }
 
 .form {
   flex: 1;
@@ -64,11 +65,26 @@ textarea:focus { border-color: var(--accent); }
 
 .form-actions { display: flex; gap: 10px; margin-top: auto; }
 
+.add-app .form-actions,
+.edit-app .form-actions {
+  margin: auto -20px -20px;
+  padding: 12px 20px 14px;
+  border-top: 1px solid var(--border);
+}
+
+.add-app .form-actions .btn-primary,
+.add-app .form-actions .btn-secondary,
+.edit-app .form-actions .btn-primary,
+.edit-app .form-actions .btn-secondary {
+  height: 35px;
+}
+
 .btn-primary,
 .btn-secondary {
   border: none;
   border-radius: var(--radius);
   cursor: pointer;
+  font-family: inherit;
   font-size: 13px;
   font-weight: 500;
   padding: 9px 20px;

@@ -48,6 +48,12 @@ function saveSettings(patch) {
   );
 }
 
+function saveWindowSize(window, settingsKey) {
+  if (!window || window.isDestroyed()) return;
+  const { width, height } = window.getBounds();
+  saveSettings({ [settingsKey]: { width, height } });
+}
+
 // ── Helper: push current task list to the main window ─────────────────────────
 function pushTasksToRenderer() {
   if (mainWindow) {
@@ -461,7 +467,7 @@ let saved = {};
 const createWindow = () => {
   mainWindow = new BrowserWindow({
     width: saved.width || 800, // *** v5 update - use saved width if available, otherwise default to 800
-    height: saved.height || 600, // *** v5 update - use saved height if available, otherwise default to 600
+    height: saved.height || 623,
     x: saved.x, // *** v5 update - undefined = OS places the window
     y: saved.y, // *** v5 update
     title: 'Task Manager',
@@ -484,6 +490,7 @@ const createWindow = () => {
   /***v5 update:agttach saveWindowState to events */
   mainWindow.on('resize', saveWindowState);
   mainWindow.on('move', saveWindowState);
+  mainWindow.on('close', saveWindowState);
 
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 
@@ -518,7 +525,7 @@ function createAddWindow() {
 
   addWindow = new BrowserWindow({
     width: savedSize.width || 500,
-    height: savedSize.height || 500,
+    height: savedSize.height || 623,
     parent: mainWindow,
     modal: true,
     title: 'Add Task',
@@ -535,10 +542,8 @@ function createAddWindow() {
   });
 
   addWindow.loadURL(ADD_WINDOW_WEBPACK_ENTRY);
-  addWindow.on('close', () => {
-    const { width, height } = addWindow.getBounds();
-    saveSettings({ addWindowSize: { width, height } });
-  });
+  addWindow.on('resize', () => saveWindowSize(addWindow, 'addWindowSize'));
+  addWindow.on('close', () => saveWindowSize(addWindow, 'addWindowSize'));
   addWindow.on('closed', () => { addWindow = null; });
 }
 
@@ -549,7 +554,7 @@ function createEditWindow(taskId) {
 
   editWindow = new BrowserWindow({
     width: savedSize.width || 500,
-    height: savedSize.height || 500,
+    height: savedSize.height || 623,
     parent: mainWindow, modal: true,
     title: 'Edit Task',
     icon: path.join(app.getAppPath(), 'assets', 'icon.png'),
@@ -563,10 +568,8 @@ function createEditWindow(taskId) {
   });
 
   editWindow.loadURL(EDIT_WINDOW_WEBPACK_ENTRY);
-  editWindow.on('close', () => {
-    const { width, height } = editWindow.getBounds();
-    saveSettings({ editWindowSize: { width, height } });
-  });
+  editWindow.on('resize', () => saveWindowSize(editWindow, 'editWindowSize'));
+  editWindow.on('close', () => saveWindowSize(editWindow, 'editWindowSize'));
 
   editWindow.webContents.on('did-finish-load', () => {
     const task = tasks.find(t => t.id === taskId);
@@ -591,8 +594,8 @@ function createDetailWindow(taskId) {
 
   const savedSize = loadSettings().detailWindowSize || {};
   detailWindow = new BrowserWindow({
-    width: savedSize.width || 520,
-    height: savedSize.height || 600,
+    width: savedSize.width || 475,
+    height: savedSize.height || 623,
     parent: mainWindow,
     modal: false,
     title: 'Task Detail',
@@ -606,10 +609,8 @@ function createDetailWindow(taskId) {
     },
   });
 
-  detailWindow.on('close', () => {
-    const { width, height } = detailWindow.getBounds();
-    saveSettings({ detailWindowSize: { width, height } });
-  });
+  detailWindow.on('resize', () => saveWindowSize(detailWindow, 'detailWindowSize'));
+  detailWindow.on('close', () => saveWindowSize(detailWindow, 'detailWindowSize'));
   detailWindow.on('closed', () => { detailWindow = null; });
   detailWindow.loadURL(detailUrl.toString());
 }

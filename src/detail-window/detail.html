@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
@@ -9,39 +10,59 @@
     <title>Task Detail</title>
   </head>
   <body>
-    <main>
-      <h1>Task Detail</h1>
+    <div class="detail-app">
+      <header class="detail-header">
+        <h1>Task Details</h1>
+      </header>
 
-      <dl>
-        <dt>Title</dt>
-        <dd id="detail-title"></dd>
+      <main class="detail-content">
+        <dl class="detail-list">
+          <div class="detail-row">
+            <dt>ID</dt>
+            <dd id="detail-id"></dd>
+          </div>
+          <div class="detail-row">
+            <dt>Title</dt>
+            <dd id="detail-title"></dd>
+          </div>
+          <div class="detail-row">
+            <dt>Priority</dt>
+            <dd id="detail-priority"></dd>
+          </div>
+          <div class="detail-row">
+            <dt>Status</dt>
+            <dd id="detail-status"></dd>
+          </div>
+          <div class="detail-row">
+            <dt>Created</dt>
+            <dd id="detail-created"></dd>
+          </div>
+          <div class="detail-row">
+            <dt>Last Updated</dt>
+            <dd id="detail-updated"></dd>
+          </div>
+        </dl>
 
-        <dt>Priority</dt>
-        <dd id="detail-priority"></dd>
+        <section class="detail-notes" aria-labelledby="detail-notes-label">
+          <div class="detail-notes-heading">
+            <h2 id="detail-notes-label">Notes</h2>
+            <button id="btn-edit-notes" class="detail-button" type="button">Edit</button>
+          </div>
+          <p id="detail-notes" class="detail-notes-value"></p>
+          <div id="notes-editor" class="notes-editor" hidden>
+            <textarea id="notes-input" aria-labelledby="detail-notes-label" maxlength="500" rows="5"></textarea>
+            <p id="notes-error" class="notes-error" role="alert" hidden></p>
+          </div>
+        </section>
+      </main>
 
-        <dt>Status</dt>
-        <dd id="detail-status"></dd>
-
-        <dt>Created</dt>
-        <dd id="detail-created"></dd>
-
-        <dt>Last Updated</dt>
-        <dd id="detail-updated"></dd>
-
-        <dt>Notes</dt>
-        <dd>
-          <p id="detail-notes"></p>
-          <button id="btn-edit-notes" type="button">Edit</button>
-        </dd>
-      </dl>
-
-      <section id="notes-editor" hidden>
-        <label for="notes-input">Notes</label>
-        <textarea id="notes-input" maxlength="500"></textarea>
-        <p id="notes-error" role="alert" hidden></p>
-        <button id="btn-save-notes" type="button">Save</button>
-        <button id="btn-cancel-notes" type="button">Cancel</button>
-      </section>
-    </main>
+      <footer class="detail-footer">
+        <button id="btn-close-detail" class="detail-button" type="button">Close</button>
+        <div id="notes-actions" class="notes-actions" hidden>
+          <button id="btn-cancel-notes" class="detail-button" type="button">Cancel</button>
+          <button id="btn-save-notes" class="detail-button detail-button-primary" type="button">Save Changes</button>
+        </div>
+      </footer>
+    </div>
   </body>
 </html>

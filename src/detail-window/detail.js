@@ -1,16 +1,33 @@
+import './detail.css';
+
 const taskId = Number(new URLSearchParams(window.location.search).get('taskId'));
+const closeButton = document.getElementById('btn-close-detail');
 const notesDisplay = document.getElementById('detail-notes');
 const editNotesButton = document.getElementById('btn-edit-notes');
 const notesEditor = document.getElementById('notes-editor');
+const notesActions = document.getElementById('notes-actions');
 const notesInput = document.getElementById('notes-input');
 const notesError = document.getElementById('notes-error');
 const saveNotesButton = document.getElementById('btn-save-notes');
 const cancelNotesButton = document.getElementById('btn-cancel-notes');
 
 let currentTask = null;
+let allowCloseWhileEditing = false;
+
+function closeDetailWindow() {
+  allowCloseWhileEditing = true;
+  window.close();
+}
+
+window.addEventListener('beforeunload', (event) => {
+  if (!notesEditor.hidden && !allowCloseWhileEditing) {
+    event.preventDefault();
+  }
+});
 
 function renderTask(task) {
   currentTask = task;
+  document.getElementById('detail-id').textContent = task.id;
   document.getElementById('detail-title').textContent = task.title;
   document.getElementById('detail-priority').textContent = task.priority;
   document.getElementById('detail-status').textContent = task.status;
@@ -21,10 +38,14 @@ function renderTask(task) {
   document.getElementById('detail-notes').textContent = task.notes;
 }
 
+closeButton.addEventListener('click', closeDetailWindow);
+
 function closeNotesEditor() {
   notesEditor.hidden = true;
   notesDisplay.hidden = false;
   editNotesButton.hidden = false;
+  closeButton.hidden = false;
+  notesActions.hidden = true;
   notesError.hidden = true;
 }
 
@@ -35,6 +56,8 @@ editNotesButton.addEventListener('click', () => {
   notesDisplay.hidden = true;
   editNotesButton.hidden = true;
   notesEditor.hidden = false;
+  closeButton.hidden = true;
+  notesActions.hidden = false;
   notesInput.focus();
 });
 
@@ -64,13 +87,13 @@ saveNotesButton.addEventListener('click', async () => {
 });
 
 if (!Number.isSafeInteger(taskId) || taskId <= 0) {
-  window.close();
+  closeDetailWindow();
 } else {
   window.taskAPI.onTasksUpdated((updatedTasks) => {
     const task = updatedTasks.find((item) => item.id === taskId);
 
     if (!task) {
-      window.close();
+      closeDetailWindow();
       return;
     }
 
@@ -86,7 +109,7 @@ if (!Number.isSafeInteger(taskId) || taskId <= 0) {
   window.taskAPI.getDetail(taskId)
     .then((task) => {
       if (!task) {
-        window.close();
+        closeDetailWindow();
         return;
       }
 

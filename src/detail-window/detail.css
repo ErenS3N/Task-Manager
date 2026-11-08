@@ -1,0 +1,243 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #111318;
+  --surface: #1c1f26;
+  --surface-hover: #242830;
+  --border: #2d3240;
+  --text: #e2e6f0;
+  --text-muted: #6b7280;
+  --accent: #4f7ef8;
+  --danger: #ef4444;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+}
+
+body {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.detail-app {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 280px;
+}
+
+.detail-header {
+  flex: 0 0 auto;
+  height: 60px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-header h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 30px;
+}
+
+.detail-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 18px 10px;
+}
+
+.detail-list {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.detail-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 14px;
+  min-height: 34px;
+}
+
+.detail-row dt,
+.detail-notes-heading h2 {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.detail-notes-heading h2 {
+  margin: 0;
+}
+
+.detail-row dd,
+.detail-notes-value {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.detail-notes {
+  margin-top: 16px;
+}
+
+.detail-notes-heading .detail-button {
+  justify-self: end;
+}
+
+.detail-notes-value {
+  margin: 0;
+  margin-top: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.detail-notes-heading {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 14px;
+  min-height: 34px;
+}
+
+.detail-button {
+  min-height: 32px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color .15s, border-color .15s;
+}
+
+.detail-button:hover {
+  border-color: #3a4050;
+  background: var(--surface-hover);
+}
+
+.detail-button:focus-visible,
+.notes-editor textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.detail-button-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.detail-button-primary:hover {
+  border-color: #6b91fa;
+  background: #426fe0;
+}
+
+.notes-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notes-editor[hidden],
+[hidden] {
+  display: none !important;
+}
+
+.notes-editor textarea {
+  width: 100%;
+  min-height: 112px;
+  max-height: 240px;
+  padding: 11px 12px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.45;
+}
+
+.notes-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.notes-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.notes-actions .detail-button {
+  flex: 1;
+  padding: 9px 20px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.detail-footer {
+  flex: 0 0 auto;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.detail-footer .detail-button {
+  width: 100%;
+  height: 35px;
+  min-height: 35px;
+}
+
+.detail-footer .notes-actions {
+  width: 100%;
+}
+
+.detail-footer .notes-actions .detail-button {
+  width: auto;
+  flex: 1;
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  transition: opacity .15s;
+}
+
+.detail-footer .notes-actions #btn-cancel-notes {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.detail-footer .notes-actions #btn-save-notes {
+  border: none;
+  background: var(--accent);
+  color: #fff;
+}
+
+.detail-footer .notes-actions .detail-button:hover {
+  opacity: .85;
+}
