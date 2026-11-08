@@ -75,6 +75,7 @@ function createTaskCard(task) {
     <div class="task-actions">
       <button class="btn-action btn-cycle"  data-action="cycle"  data-id="${task.id}">→ ${nextStatus}</button>
       <button class="btn-action btn-edit"   data-action="edit"   data-id="${task.id}">Edit</button>
+      <button class="btn-action btn-detail" data-action="detail" data-id="${task.id}">Detail</button>
       <button class="btn-action btn-delete" data-action="delete" data-id="${task.id}">Delete</button>
     </div>
   `;
@@ -141,6 +142,10 @@ taskList.addEventListener('click', async (e) => {
 
   if (action === 'edit') {
     window.taskAPI.openEditWindow(taskId);
+  }
+
+  if (action === 'detail') {
+    window.taskAPI.openDetailWindow(taskId);
   }
 
   if (action === 'cycle') {

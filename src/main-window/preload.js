@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld('taskAPI', {
   // Ask main to open the edit window for this task id
   openEditWindow: (taskId) => ipcRenderer.invoke('window:open-edit', taskId),
 
+  // Ask main to open the detail window for this task id
+  openDetailWindow: (taskId) => ipcRenderer.invoke('window:open-detail', taskId),
+
   // Ask main to delete a task — includes the native confirmation dialog in main
   deleteTask: (taskId) => ipcRenderer.invoke('tasks:delete', taskId),
 
