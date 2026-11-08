@@ -34,4 +34,6 @@
 
 - **Public update repository:** Changed the updater source to the public `ErenS3N/Task-Manager` repository, matching the `release` remote. `pnpm make` passed with the new target. The initial lack of SemVer tags was resolved by publishing `v3.0.0` and `v3.0.1`.
 
-- **Release test correction:** Confirmed the installed app is `3.0.1`, while the public `v3.0.1` tag points to a commit before the title-field selector fix. Therefore, the update delivered by that release could not contain the fix. Bumped the package version to `3.0.2`; `pnpm make` passed, embedded version and Squirrel asset names were verified, and `v3.0.2` remains to be pushed and published.
+- **Release test correction:** Confirmed the installed app is `3.0.1`, while the public `v3.0.1` tag points to a commit before the title-field selector fix. Therefore, the update delivered by that release could not contain the fix. Bumped the package version to `3.0.2`; `pnpm make` passed, and the embedded version and Squirrel asset names were verified. The fixed `v3.0.2` release is now published.
+
+- **Updater release propagation:** Confirmed the public `v3.0.2` release is stable and has the required Squirrel assets. At 21:12 UTC, `update.electronjs.org` still offered `v3.0.1` to a `3.0.0` client and returned `204` for `3.0.1`; this matches the service's default 15-minute release-cache TTL. `update-electron-app` checks every 10 minutes, so restart after the service cache refreshes to recheck.
