@@ -53,6 +53,10 @@ function pushTasksToRenderer() {
   if (mainWindow) {
     mainWindow.webContents.send('tasks:updated', tasks);
   }
+
+  if (detailWindow && !detailWindow.isDestroyed()) {
+    detailWindow.webContents.send('tasks:updated', tasks);
+  }
   refreshTrayUI();
 }
 
@@ -249,6 +253,22 @@ ipcMain.handle('window:open-detail', (_event, taskId) => {
 ipcMain.handle('tasks:getDetail', (_event, taskId) => {
   if (!Number.isInteger(taskId) || taskId <= 0) return null;
   return tasks.find(task => task.id === taskId) || null;
+});
+
+// Validates in main, updates only notes and updatedAt
+ipcMain.handle('tasks:updateNotes', (_event, taskId, notes) => {
+  if (!Number.isInteger(taskId) || taskId <= 0
+      || typeof notes !== 'string' || notes.length > 500) {
+    return null;
+  }
+
+  const task = tasks.find(item => item.id === taskId);
+  if (!task) return null;
+
+  task.notes = notes;
+  task.updatedAt = Date.now();
+  pushTasksToRenderer();
+  return task;
 });
 
 // Save edits to an existing task

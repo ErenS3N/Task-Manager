@@ -217,6 +217,7 @@ html, body {
   transition: opacity .15s;
 }
 .btn-edit   { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+.btn-detail { background: #1b2c4b; color: #a9c2ff; border: 1px solid #34517e; }
 .btn-cycle  { background: #1e2330; color: #93c5fd; border: 1px solid #334155; }
 .btn-delete { background: #3d1010;         color: var(--danger);     border: 1px solid #5a1a1a; }
 .btn-action:hover { opacity: .8; }
