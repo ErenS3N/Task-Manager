@@ -7,6 +7,16 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('taskAPI', {
 
+  getUpdateState: () => ipcRenderer.invoke('updates:get-state'),
+
+  installUpdate: () => ipcRenderer.invoke('updates:install'),
+
+  onUpdateState: (callback) => {
+    const handler = (_event, state) => callback(state);
+    ipcRenderer.on('updates:state', handler);
+    return () => ipcRenderer.removeListener('updates:state', handler);
+  },
+
   // ── Carried forward from v2 ───────────────────────────────────────────────
 
   // Ask the main process to open the add window

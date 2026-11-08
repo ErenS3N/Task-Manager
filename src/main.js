@@ -1,6 +1,7 @@
-const { app, BrowserWindow, Menu, dialog, ipcMain, Tray, nativeImage, Notification } = require('electron')
+const { app, autoUpdater, BrowserWindow, Menu, dialog, ipcMain, Tray, nativeImage, Notification } = require('electron')
 const path = require('node:path');
 const fs = require('node:fs');
+const { updateElectronApp, UpdateSourceType } = require('update-electron-app');
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -25,6 +26,7 @@ let editWindow = null;  // NEW in v3
 let detailWindow = null;
 let tray = null;  // NEW in v3 — module-scope prevents the GC footgun - GC footgun is when the tray gets garbage collected if not referenced.
 let activePriorityFilter = 'All';
+let updateState = { status: 'idle' };
 
 /*** V5 update - Declare the settingsPath variable for storing the path to the settings.json file ***/
 // let settingsPath = path.join(app.getPath('userData'), 'settings.json');
@@ -53,6 +55,18 @@ function saveWindowSize(window, settingsKey) {
   const { width, height } = window.getBounds();
   saveSettings({ [settingsKey]: { width, height } });
 }
+
+function publishUpdateState(status) {
+  updateState = { status };
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('updates:state', updateState);
+  }
+}
+
+autoUpdater.on('update-available', () => publishUpdateState('available'));
+autoUpdater.on('update-not-available', () => publishUpdateState('idle'));
+autoUpdater.on('update-downloaded', () => publishUpdateState('downloaded'));
+autoUpdater.on('error', error => console.error('[updater] Update check failed:', error));
 
 // ── Helper: push current task list to the main window ─────────────────────────
 function pushTasksToRenderer() {
@@ -147,6 +161,16 @@ function refreshTrayUI() {
 
 // Return the full task list
 ipcMain.handle('tasks:get', () => tasks);
+
+ipcMain.handle('updates:get-state', () => updateState);
+ipcMain.handle('updates:install', (event) => {
+  if (event.sender !== mainWindow?.webContents || updateState.status !== 'downloaded') {
+    return false;
+  }
+
+  autoUpdater.quitAndInstall();
+  return true;
+});
 
 // Open the add window
 ipcMain.handle('window:open-add', () => { createAddWindow(); });
@@ -497,6 +521,7 @@ const createWindow = () => {
   mainWindow.webContents.on('did-finish-load', () => {
     pushTasksToRenderer();
     mainWindow.webContents.send('tasks:filter', activePriorityFilter);
+    mainWindow.webContents.send('updates:state', updateState);
 
     const settings = loadSettings();
     if (validStatusFilters.has(settings.activeFilter)) {
@@ -744,6 +769,16 @@ app.whenReady().then(() => {
   buildMenu();
   createWindow();
   createTray();   // NEW in v3
+
+  if (app.isPackaged && ['win32', 'darwin'].includes(process.platform)) {
+    updateElectronApp({
+      updateSource: {
+        type: UpdateSourceType.ElectronPublicUpdateService,
+        repo: 'NSCC-ITC-Fall2026-INFT4000-MDelano/inft4000-700-task-manager-v3-code-analysis-erens3n',
+      },
+      notifyUser: false,
+    });
+  }
 
   // macOS: re-open the window when the Dock icon is clicked
   app.on('activate', () => {
