@@ -774,7 +774,7 @@ app.whenReady().then(() => {
     updateElectronApp({
       updateSource: {
         type: UpdateSourceType.ElectronPublicUpdateService,
-        repo: 'NSCC-ITC-Fall2026-INFT4000-MDelano/inft4000-700-task-manager-v3-code-analysis-erens3n',
+        repo: 'ErenS3N/Task-Manager',
       },
       notifyUser: false,
     });
