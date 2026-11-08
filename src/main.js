@@ -11,10 +11,10 @@ if (require('electron-squirrel-startup')) {
 let nextId = 5;
 
 const tasks = [
-  { id: 1, title: 'Design dashboard screen', priority: 'High', status: 'In Progress' },
-  { id: 2, title: 'Write unit tests for API', priority: 'Medium', status: 'To Do' },
-  { id: 3, title: 'Update README documentation', priority: 'Low', status: 'Done' },
-  { id: 4, title: 'Fix login bug', priority: 'High', status: 'To Do' },
+  { id: 1, title: 'Design dashboard screen', priority: 'High', status: 'In Progress', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
+  { id: 2, title: 'Write unit tests for API', priority: 'Medium', status: 'To Do', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
+  { id: 3, title: 'Update README documentation', priority: 'Low', status: 'Done', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
+  { id: 4, title: 'Fix login bug', priority: 'High', status: 'To Do', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
 ];
 
 // ── Module-scope window / tray references ─────────────────────────────────────
@@ -90,7 +90,10 @@ function refreshTrayUI() {
         if (confirm.response !== 0) return;
 
         tasks.forEach(task => {
-          task.status = 'Done';
+          if (task.status !== 'Done') {
+            task.status = 'Done';
+            task.updatedAt = Date.now();
+          }
         });
         pushTasksToRenderer();
       },
@@ -163,11 +166,29 @@ function sanitiseTasks(parsed) {
     }
     seenIds.add(id);
 
+    const now = Date.now();
+    const createdAt = Number.isSafeInteger(task.createdAt) && task.createdAt >= 0
+      ? task.createdAt
+      : now;
+
+    const updatedAt = Number.isSafeInteger(task.updatedAt) && task.updatedAt >= 0
+      ? task.updatedAt
+      : createdAt;
+
+    const notes = task.notes === undefined ? '' : task.notes;
+
+    if (typeof notes !== 'string' || notes.length > 500) {
+      throw new Error('Task notes must be a string of 500 characters or fewer.');
+    }
+
     return {
       id,
       title: String(task.title).slice(0, 120),
       priority: VALID_PRIORITY.includes(task.priority) ? task.priority : 'Low',
       status: VALID_STATUS.includes(task.status) ? task.status : 'To Do',
+      notes,
+      createdAt,
+      updatedAt
     };
   });
 }
@@ -175,19 +196,29 @@ function sanitiseTasks(parsed) {
 // Add a new task
 ipcMain.handle('tasks:add', (_event, task) => {
   // Validate the task object before adding it
+  if (!task || typeof task !== 'object' || Array.isArray(task)) return null;
+  
+  const notes = task.notes === undefined ? '' : task.notes;
+
   if (typeof task.title !== 'string' // Title must be a string
+      || typeof notes !== 'string' // Notes must be a string
       || task.title.trim().length === 0 // Title cannot be empty
       || task.title.length > 120 // Maximum title length is 120 characters
+      || notes.length > 500 // Maximum note length is 500 characters.
       || !VALID_PRIORITY.includes(task.priority) // Priority must be one of the valid options
       || !VALID_STATUS.includes(task.status))// Status must be one of the valid options
     return null
 
   // Create a new task object with validated properties
+  const now = Date.now();
   const newTask = {
     id: nextId++,
     title: task.title,
     priority: task.priority,
     status: task.status,
+    notes: notes,
+    createdAt: now,
+    updatedAt: now,
   };
   tasks.push(newTask);
   pushTasksToRenderer();
@@ -212,12 +243,14 @@ ipcMain.handle('tasks:getOne', (_event, taskId) => {
 // Save edits to an existing task
 ipcMain.handle('tasks:update', (_event, updated) => {
   if (!updated
+    || typeof updated.title !== 'string'
     || typeof updated !== 'object'
+    || typeof updated.notes !== 'string'
     || !Number.isInteger(updated.id)
     || updated.id <= 0
-    || typeof updated.title !== 'string'
     || updated.title.trim().length === 0
     || updated.title.length > 120
+    || updated.notes.length > 500
     || !VALID_PRIORITY.includes(updated.priority)
     || !VALID_STATUS.includes(updated.status)
   ) {
@@ -226,12 +259,17 @@ ipcMain.handle('tasks:update', (_event, updated) => {
 
   const idx = tasks.findIndex(t => t.id === updated.id);
   if (idx === -1) return null;
+  const existingTask = tasks[idx];
+  const now = Date.now();
 
   tasks[idx] = {
     id: updated.id,
     title: updated.title,
     priority: updated.priority,
     status: updated.status,
+    notes: updated.notes,
+    createdAt: existingTask.createdAt,
+    updatedAt: now
   };
 
   pushTasksToRenderer();
@@ -247,6 +285,7 @@ ipcMain.handle('tasks:cycleStatus', (_event, taskId) => {
   const currentIndex = statusOrder.indexOf(tasks[idx].status);
   const nextIndex = (currentIndex + 1) % statusOrder.length;
   tasks[idx].status = statusOrder[nextIndex];
+  tasks[idx].updatedAt = Date.now();
 
   if (tasks[idx].status === 'Done') {
     new Notification({

@@ -42,7 +42,8 @@ label { font-size: 12px; font-weight: 500; color: var(--text-muted); }
 .required { color: var(--danger); }
 
 input[type="text"],
-select {
+select,
+textarea {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -53,9 +54,11 @@ select {
   transition: border-color .15s;
   width: 100%;
 }
+textarea { resize: vertical; }
 input[type="text"]::placeholder { color: var(--text-muted); }
 input[type="text"]:focus,
-select:focus { border-color: var(--accent); }
+select:focus,
+textarea:focus { border-color: var(--accent); }
 
 .field-error { color: var(--danger); font-size: 12px; }
 
