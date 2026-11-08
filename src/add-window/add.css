@@ -43,12 +43,12 @@ html, body {
 label { font-size: 12px; font-weight: 500; color: var(--text-muted); }
 .required { color: var(--danger); }
 
-input[type="text"] {
+input {
   -webkit-appearance: none;
   appearance: none;
 }
 
-input[type="text"],
+input,
 select,
 textarea {
   background: var(--surface);
@@ -62,8 +62,8 @@ textarea {
   width: 100%;
 }
 textarea { resize: vertical; }
-input[type="text"]::placeholder { color: var(--text-muted); }
-input[type="text"]:focus,
+input::placeholder { color: var(--text-muted); }
+input:focus,
 select:focus,
 textarea:focus { border-color: var(--accent); }
 
