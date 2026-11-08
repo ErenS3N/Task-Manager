@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
+    />
+    <title>Task Detail</title>
+  </head>
+  <body>
+    <main>
+      <h1>Task Detail</h1>
+
+      <dl>
+        <dt>Title</dt>
+        <dd id="detail-title"></dd>
+
+        <dt>Priority</dt>
+        <dd id="detail-priority"></dd>
+
+        <dt>Status</dt>
+        <dd id="detail-status"></dd>
+
+        <dt>Created</dt>
+        <dd id="detail-created"></dd>
+
+        <dt>Last Updated</dt>
+        <dd id="detail-updated"></dd>
+
+        <dt>Notes</dt>
+        <dd>
+          <p id="detail-notes"></p>
+          <button id="btn-edit-notes" type="button">Edit</button>
+        </dd>
+      </dl>
+
+      <section id="notes-editor" hidden>
+        <label for="notes-input">Notes</label>
+        <textarea id="notes-input" maxlength="500"></textarea>
+        <button id="btn-save-notes" type="button">Save</button>
+        <button id="btn-cancel-notes" type="button">Cancel</button>
+      </section>
+    </main>
+  </body>
+</html>
