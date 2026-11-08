@@ -240,6 +240,12 @@ ipcMain.handle('tasks:getOne', (_event, taskId) => {
   return tasks.find(t => t.id === taskId) || null;
 });
 
+// Gives the detail window a dedicated IPC request by task ID and returns the full object
+ipcMain.handle('tasks:getDetail', (_event, taskId) => {
+  if (!Number.isInteger(taskId) || taskId <= 0) return null;
+  return tasks.find(task => task.id === taskId) || null;
+});
+
 // Save edits to an existing task
 ipcMain.handle('tasks:update', (_event, updated) => {
   if (!updated
