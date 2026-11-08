@@ -203,13 +203,9 @@ ipcMain.handle('tasks:add', (_event, task) => {
   // Validate the task object before adding it
   if (!task || typeof task !== 'object' || Array.isArray(task)) return null;
   
-  const notes = task.notes === undefined ? '' : task.notes;
-
   if (typeof task.title !== 'string' // Title must be a string
-      || typeof notes !== 'string' // Notes must be a string
       || task.title.trim().length === 0 // Title cannot be empty
       || task.title.length > 120 // Maximum title length is 120 characters
-      || notes.length > 500 // Maximum note length is 500 characters.
       || !VALID_PRIORITY.includes(task.priority) // Priority must be one of the valid options
       || !VALID_STATUS.includes(task.status))// Status must be one of the valid options
     return null
@@ -221,7 +217,7 @@ ipcMain.handle('tasks:add', (_event, task) => {
     title: task.title,
     priority: task.priority,
     status: task.status,
-    notes: notes,
+    notes: '',
     createdAt: now,
     updatedAt: now,
   };
@@ -276,12 +272,10 @@ ipcMain.handle('tasks:update', (_event, updated) => {
   if (!updated
     || typeof updated.title !== 'string'
     || typeof updated !== 'object'
-    || typeof updated.notes !== 'string'
     || !Number.isInteger(updated.id)
     || updated.id <= 0
     || updated.title.trim().length === 0
     || updated.title.length > 120
-    || updated.notes.length > 500
     || !VALID_PRIORITY.includes(updated.priority)
     || !VALID_STATUS.includes(updated.status)
   ) {
@@ -298,7 +292,7 @@ ipcMain.handle('tasks:update', (_event, updated) => {
     title: updated.title,
     priority: updated.priority,
     status: updated.status,
-    notes: updated.notes,
+    notes: existingTask.notes,
     createdAt: existingTask.createdAt,
     updatedAt: now
   };
@@ -520,15 +514,16 @@ const createWindow = () => {
 
 function createAddWindow() {
   if (addWindow) { addWindow.focus(); return; }
+  const savedSize = loadSettings().addWindowSize || {};
 
   addWindow = new BrowserWindow({
-    width: 440,
-    height: 380,
+    width: savedSize.width || 500,
+    height: savedSize.height || 500,
     parent: mainWindow,
     modal: true,
     title: 'Add Task',
     icon: path.join(app.getAppPath(), 'assets', 'icon.png'),
-    resizable: false,
+    resizable: true,
     minimizable: false,
     maximizable: false,
     webPreferences: {
@@ -540,19 +535,25 @@ function createAddWindow() {
   });
 
   addWindow.loadURL(ADD_WINDOW_WEBPACK_ENTRY);
+  addWindow.on('close', () => {
+    const { width, height } = addWindow.getBounds();
+    saveSettings({ addWindowSize: { width, height } });
+  });
   addWindow.on('closed', () => { addWindow = null; });
 }
 
 // NEW in v3: Edit window — pre-filled form for an existing task
 function createEditWindow(taskId) {
   if (editWindow) { editWindow.focus(); return; }
+  const savedSize = loadSettings().editWindowSize || {};
 
   editWindow = new BrowserWindow({
-    width: 440, height: 380,
+    width: savedSize.width || 500,
+    height: savedSize.height || 500,
     parent: mainWindow, modal: true,
     title: 'Edit Task',
     icon: path.join(app.getAppPath(), 'assets', 'icon.png'),
-    resizable: false, minimizable: false, maximizable: false,
+    resizable: true, minimizable: false, maximizable: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -562,6 +563,10 @@ function createEditWindow(taskId) {
   });
 
   editWindow.loadURL(EDIT_WINDOW_WEBPACK_ENTRY);
+  editWindow.on('close', () => {
+    const { width, height } = editWindow.getBounds();
+    saveSettings({ editWindowSize: { width, height } });
+  });
 
   editWindow.webContents.on('did-finish-load', () => {
     const task = tasks.find(t => t.id === taskId);
@@ -584,13 +589,15 @@ function createDetailWindow(taskId) {
     return;
   }
 
+  const savedSize = loadSettings().detailWindowSize || {};
   detailWindow = new BrowserWindow({
-    width: 520,
-    height: 600,
+    width: savedSize.width || 520,
+    height: savedSize.height || 600,
     parent: mainWindow,
     modal: false,
     title: 'Task Detail',
     icon: path.join(app.getAppPath(), 'assets', 'icon.png'),
+    resizable: true,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -599,6 +606,10 @@ function createDetailWindow(taskId) {
     },
   });
 
+  detailWindow.on('close', () => {
+    const { width, height } = detailWindow.getBounds();
+    saveSettings({ detailWindowSize: { width, height } });
+  });
   detailWindow.on('closed', () => { detailWindow = null; });
   detailWindow.loadURL(detailUrl.toString());
 }

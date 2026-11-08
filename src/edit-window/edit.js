@@ -15,7 +15,6 @@ window.taskAPI.onLoadTask((task) => {
   titleInput.value = task.title;
   document.getElementById('task-priority').value = task.priority;
   document.getElementById('task-status').value   = task.status;
-  document.getElementById('task-notes').value    = task.notes ?? '';
   titleInput.focus();
   titleInput.select();
 });
@@ -42,7 +41,6 @@ form.addEventListener('submit', async (e) => {
       title,
       priority: document.getElementById('task-priority').value,
       status:   document.getElementById('task-status').value,
-      notes:    document.getElementById('task-notes').value
     });
 
     // Main has updated the task and called pushTasksToRenderer();

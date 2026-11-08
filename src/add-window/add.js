@@ -15,7 +15,6 @@ form.addEventListener('submit', async(e) => {
   const title    = titleInput.value.trim();
   const priority = document.getElementById('task-priority').value;
   const status   = document.getElementById('task-status').value;
-  const notes    = document.getElementById('task-notes').value;
 
   if (!title) {
     titleError.hidden = false;
@@ -33,7 +32,7 @@ form.addEventListener('submit', async(e) => {
  
   try {
     // Send the task to main.js — invoke returns the saved task object
-    await window.taskAPI.addTask({ title, priority, status, notes });
+    await window.taskAPI.addTask({ title, priority, status });
     // console.log('[add-window] Task saved:', saved);
  
     // Show the success state only after main confirms the task was saved.
