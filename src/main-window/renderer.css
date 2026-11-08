@@ -110,6 +110,21 @@ html, body {
 .btn-add:hover  { opacity: .85; }
 .btn-add:active { opacity: .7;  }
 
+.update-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.update-notice[hidden] { display: none; }
+.update-notice[data-state="available"] { background: #302713; color: #fcd34d; }
+.update-notice[data-state="downloaded"] { background: #123021; color: #86efac; }
+.update-message { flex: 1; }
+.update-install { flex-shrink: 0; font-size: 12px; padding: 6px 12px; }
+
 .filter-bar {
   display: flex;
   gap: 4px;

@@ -7,10 +7,38 @@ const btnAdd     = document.getElementById('btn-add')
 const btnOpen    = document.getElementById('btn-open')   // NEW in v3
 const btnSave    = document.getElementById('btn-save')   // NEW in v3
 const btnClearAll = document.getElementById('btn-clear-all')
+const updateNotice = document.getElementById('update-notice')
+const updateMessage = document.getElementById('update-message')
+const updateInstall = document.getElementById('btn-update-install')
 
 const filterBtns = document.querySelectorAll('.filter-btn');
 
 console.log('Main window renderer loaded')
+
+function renderUpdateState(state) {
+  if (state?.status === 'available') {
+    updateNotice.dataset.state = 'available';
+    updateMessage.textContent = 'An update is available. Downloading in the background.';
+    updateInstall.hidden = true;
+    updateNotice.hidden = false;
+    return;
+  }
+
+  if (state?.status === 'downloaded') {
+    updateNotice.dataset.state = 'downloaded';
+    updateMessage.textContent = 'An update is ready to install.';
+    updateInstall.hidden = false;
+    updateNotice.hidden = false;
+    return;
+  }
+
+  updateNotice.hidden = true;
+  updateInstall.hidden = true;
+}
+
+window.taskAPI.onUpdateState(renderUpdateState);
+window.taskAPI.getUpdateState().then(renderUpdateState);
+updateInstall.addEventListener('click', () => window.taskAPI.installUpdate());
 
 let activeStatusFilter = 'all';
 let activePriorityFilter = 'All';
