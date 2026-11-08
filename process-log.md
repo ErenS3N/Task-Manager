@@ -17,3 +17,5 @@
 - **Detail route recovery:** A failed `pnpm start` cleanup left `.webpack/renderer/detail_window` missing, which caused `Cannot GET /detail_window/index.html`. Stopped the stale Electron process tree from this workspace and restarted Forge; startup succeeded and regenerated the Detail renderer route.
 
 - **Window dimension persistence:** Centralized Add, Edit, and Detail saves on resize and close, and added a Main-window snapshot before its close-to-tray handler. Existing settings already contained saved dimensions; the additional event coverage ensures the latest bounds are recorded. Diagnostics found no errors; packaging was not run while the app was open.
+
+- **Part 2 - Updater research:** Added `update-electron-app` as the updater dependency. Confirmed its GitHub update service requires a public repository and GitHub Releases; Windows releases must include the Squirrel `RELEASES` manifest and full `.nupkg`. The configured course remote is not publicly accessible, so the app will need a public release repository for live update checks.
