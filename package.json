@@ -1,7 +1,7 @@
 {
   "name": "task-manager-v3",
   "productName": "Task Manager",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "INFT4000 Task Manager v3 — Native UI & Lifecycle",
   "main": ".webpack/main",
   "private": true,
