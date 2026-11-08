@@ -64,6 +64,12 @@ module.exports = {
               name:    'edit_window',
               preload: { js: './src/edit-window/preload.js' },
             },
+            {
+              html: './src/detail-window/detail.html',
+              js: './src/detail-window/detail.js',
+              name: 'detail_window',
+              preload: { js: './src/detail-window/preload.js' },
+            },
           ],
         },
       },
