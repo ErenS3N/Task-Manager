@@ -2,6 +2,32 @@ const { app, autoUpdater, BrowserWindow, Menu, dialog, ipcMain, Tray, nativeImag
 const path = require('node:path');
 const fs = require('node:fs');
 const { updateElectronApp, UpdateSourceType } = require('update-electron-app');
+const Store = require('electron-store').default;
+
+// Create a store instance for managing application settings.
+const settingsStore = new Store({
+  name: 'settings',
+  defaults: {
+    windowState: { width: 800, height: 623 },
+    activeFilter: 'All'
+  }
+});
+
+//Initialize the store for task data.
+const taskStore = new Store({
+  name: 'tasks',
+  defaults: { tasks: [] }
+});
+
+// Timeout handle for debounced save.
+let saveTimeout = null
+// Debounced save function for task updates, to prevent excessive writes to the store.
+function debouncedSave() {
+  clearTimeout(saveTimeout)// Clear any pending save to debounce rapid updates.
+  saveTimeout = setTimeout(() => {// Save the tasks to the store after the debounce period.
+    taskStore.set('tasks', tasks)
+  }, 300)
+}
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -9,14 +35,12 @@ if (require('electron-squirrel-startup')) {
 }
 
 // ── Task data — owned by main (same as v2) ────────────────────────────────────
-let nextId = 5;
-
-const tasks = [
-  { id: 1, title: 'Design dashboard screen', priority: 'High', status: 'In Progress', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
-  { id: 2, title: 'Write unit tests for API', priority: 'Medium', status: 'To Do', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
-  { id: 3, title: 'Update README documentation', priority: 'Low', status: 'Done', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
-  { id: 4, title: 'Fix login bug', priority: 'High', status: 'To Do', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
-];
+// const tasks = [
+//   { id: 1, title: 'Design dashboard screen', priority: 'High', status: 'In Progress', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
+//   { id: 2, title: 'Write unit tests for API', priority: 'Medium', status: 'To Do', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
+//   { id: 3, title: 'Update README documentation', priority: 'Low', status: 'Done', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
+//   { id: 4, title: 'Fix login bug', priority: 'High', status: 'To Do', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
+// ];
 
 // ── Module-scope window / tray references ─────────────────────────────────────
 // IMPORTANT: must be module-scope — a local variable would be GC'd silently.
@@ -28,32 +52,21 @@ let tray = null;  // NEW in v3 — module-scope prevents the GC footgun - GC foo
 let activePriorityFilter = 'All';
 let updateState = { status: 'idle' };
 
-/*** V5 update - Declare the settingsPath variable for storing the path to the settings.json file ***/
-// let settingsPath = path.join(app.getPath('userData'), 'settings.json');
-let settingsPath = null;
-const validStatusFilters = new Set(['all', 'To Do', 'In Progress', 'Done']);
+//Load tasks from the persistent store
+let tasks = taskStore.get('tasks')
 
-/*** v5 update - Load and save settings functions for managing the settings.json file */
-function loadSettings() {
-  try {
-    return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-  } catch {
-    return {};
-  }
-}
-// *** V5 update - Save the settings.json file with the provided patch (updates).
-function saveSettings(patch) {
-  const current = loadSettings();
-  fs.writeFileSync(
-    settingsPath,
-    JSON.stringify({ ...current, ...patch }, null, 2)
-  );
-}
+// Filter out invalid tasks
+tasks = tasks.filter(t => t && typeof t.id === 'number')
+
+// nextId keeps track of the next task ID to be assigned
+let nextId = tasks.length > 0 ? Math.max(...tasks.map(t => t.id)) + 1 : 1;
+
+const validStatusFilters = new Set(['all', 'To Do', 'In Progress', 'Done']);
 
 function saveWindowSize(window, settingsKey) {
   if (!window || window.isDestroyed()) return;
   const { width, height } = window.getBounds();
-  saveSettings({ [settingsKey]: { width, height } });
+  settingsStore.set(settingsKey, { width, height });
 }
 
 function publishUpdateState(status) {
@@ -176,7 +189,13 @@ ipcMain.handle('updates:install', (event) => {
 ipcMain.handle('window:open-add', () => { createAddWindow(); });
 
 // Close the add window
-ipcMain.handle('window:close-add', () => { if (addWindow) addWindow.close(); });
+ipcMain.handle('window:close-add', () => {
+  if (addWindow) addWindow.close();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
 
 // Validation constants for task properties
 const VALID_PRIORITY = ['Low', 'Medium', 'High']
@@ -252,6 +271,8 @@ ipcMain.handle('tasks:add', (_event, task) => {
     updatedAt: now,
   };
   tasks.push(newTask);
+  // Save the updated task list to the persistent store
+  taskStore.set('tasks', tasks);
   pushTasksToRenderer();
   return newTask;
 });
@@ -293,6 +314,9 @@ ipcMain.handle('tasks:updateNotes', (_event, taskId, notes) => {
 
   task.notes = notes;
   task.updatedAt = Date.now();
+
+  debouncedSave();
+
   pushTasksToRenderer();
   return task;
 });
@@ -327,6 +351,9 @@ ipcMain.handle('tasks:update', (_event, updated) => {
     updatedAt: now
   };
 
+  // Save the updated task list to the persistent store
+  taskStore.set('tasks', tasks);
+
   pushTasksToRenderer();
   return tasks[idx];
 });
@@ -349,6 +376,9 @@ ipcMain.handle('tasks:cycleStatus', (_event, taskId) => {
     }).show();
   }
 
+  // Save the updated task list to the persistent store
+  taskStore.set('tasks', tasks);
+
   pushTasksToRenderer();
   return tasks[idx];
 });
@@ -367,6 +397,10 @@ ipcMain.handle('tasks:clearAll', async () => {
   if (result.response !== 0) return false;
 
   tasks.splice(0, tasks.length);
+
+  // Save the updated task list to the persistent store
+  taskStore.set('tasks', tasks);
+
   pushTasksToRenderer();
   return true;
 });
@@ -393,6 +427,10 @@ ipcMain.handle('tasks:delete', async (_event, taskId) => {
   const idx = tasks.findIndex(t => t.id === taskId);
   if (idx === -1) return false;
   tasks.splice(idx, 1);
+
+  // Save the updated task list to the persistent store
+  taskStore.set('tasks', tasks);
+
   pushTasksToRenderer();
   return true;
 });
@@ -481,19 +519,18 @@ ipcMain.handle('dialog:saveFile', async () => {
 
 ipcMain.on('settings:saveFilter', (_event, filter) => {
   if (!validStatusFilters.has(filter)) return;
-  saveSettings({ activeFilter: filter });
+  settingsStore.set('activeFilter', filter);
 });
-
-let saved = {};
 
 // ── Window creation ───────────────────────────────────────────────────────────
 
 const createWindow = () => {
+  const saved = settingsStore.get('windowState', {});
   mainWindow = new BrowserWindow({
-    width: saved.width || 800, // *** v5 update - use saved width if available, otherwise default to 800
+    width: saved.width || 800,
     height: saved.height || 623,
-    x: saved.x, // *** v5 update - undefined = OS places the window
-    y: saved.y, // *** v5 update
+    x: saved.x,
+    y: saved.y,
     title: 'Task Manager',
     icon: path.join(app.getAppPath(), 'assets', 'icon.png'), //<a href="https://www.flaticon.com/free-icons/execution" title="execution icons">Execution icons created by kliwir art - Flaticon</a>
     webPreferences: {
@@ -508,7 +545,7 @@ const createWindow = () => {
   function saveWindowState() {
     if (!mainWindow || mainWindow.isMinimized()) return;
     const { x, y, width, height } = mainWindow.getBounds();
-    saveSettings({ windowState: { x, y, width, height } });
+    settingsStore.set('windowState', { x, y, width, height });
   }
 
   /***v5 update:agttach saveWindowState to events */
@@ -523,9 +560,9 @@ const createWindow = () => {
     mainWindow.webContents.send('tasks:filter', activePriorityFilter);
     mainWindow.webContents.send('updates:state', updateState);
 
-    const settings = loadSettings();
-    if (validStatusFilters.has(settings.activeFilter)) {
-      mainWindow.webContents.send('tasks:restoreFilter', settings.activeFilter);
+    const activeFilter = settingsStore.get('activeFilter');
+    if (validStatusFilters.has(activeFilter)) {
+      mainWindow.webContents.send('tasks:restoreFilter', activeFilter);
     }
   });
 
@@ -546,7 +583,7 @@ const createWindow = () => {
 
 function createAddWindow() {
   if (addWindow) { addWindow.focus(); return; }
-  const savedSize = loadSettings().addWindowSize || {};
+  const savedSize = settingsStore.get('addWindowSize', {});
 
   addWindow = new BrowserWindow({
     width: savedSize.width || 500,
@@ -575,7 +612,7 @@ function createAddWindow() {
 // NEW in v3: Edit window — pre-filled form for an existing task
 function createEditWindow(taskId) {
   if (editWindow) { editWindow.focus(); return; }
-  const savedSize = loadSettings().editWindowSize || {};
+  const savedSize = settingsStore.get('editWindowSize', {});
 
   editWindow = new BrowserWindow({
     width: savedSize.width || 500,
@@ -617,7 +654,7 @@ function createDetailWindow(taskId) {
     return;
   }
 
-  const savedSize = loadSettings().detailWindowSize || {};
+  const savedSize = settingsStore.get('detailWindowSize', {});
   detailWindow = new BrowserWindow({
     width: savedSize.width || 475,
     height: savedSize.height || 623,
@@ -758,14 +795,6 @@ function createTray() {
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
-  /*** v5 update -> assign settingsPath here, after the app is ready.
-  app.getPath('userData') is only safe to call after whenReady() resolves. ***/
-  settingsPath = path.join(app.getPath('userData'), 'settings.json');
-  console.log('settings path', settingsPath);
-
-  // *** v5 update - get the saved window state or default to an empty object
-  saved = loadSettings().windowState || {};
-
   buildMenu();
   createWindow();
   createTray();   // NEW in v3
@@ -789,8 +818,6 @@ app.whenReady().then(() => {
     }
   });
 
-  saveSettings({ test: true }); // v4 test 2
-  console.log(loadSettings()); // v4  test 1
 });
 
 // Windows / Linux: quit when the last window closes.

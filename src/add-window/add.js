@@ -4,7 +4,6 @@ const form        = document.getElementById('add-form');
 const titleInput  = document.getElementById('task-title');
 const titleError  = document.getElementById('title-error');
 const btnCancel   = document.getElementById('btn-cancel');
-const savedNotice = document.getElementById('saved-notice');
 
 titleInput.focus();
 
@@ -23,31 +22,24 @@ form.addEventListener('submit', async(e) => {
   }
   titleError.hidden = true;
 
-  /* BEGIN OF CODE UPDATE */
-
   // Disable the save button while the IPC call is in flight
   const btnSave = document.getElementById('btn-save');
   btnSave.disabled = true;
   btnSave.textContent = 'Saving…';
- 
+
   try {
     // Send the task to main.js — invoke returns the saved task object
-    await window.taskAPI.addTask({ title, priority, status });
-    // console.log('[add-window] Task saved:', saved);
- 
-    // Show the success state only after main confirms the task was saved.
-    form.hidden = true;
-    savedNotice.hidden = false;
+    const savedTask = await window.taskAPI.addTask({ title, priority, status });
+    if (!savedTask) {
+      throw new Error('The task could not be saved.');
+    }
 
-    // Close this window after the acknowledgement is visible.
-    setTimeout(() => window.taskAPI.closeWindow(), 800);
- 
+    await window.taskAPI.closeWindow();
   } catch (err) {
     console.error('[add-window] Failed to save task:', err);
     btnSave.disabled = false;
     btnSave.textContent = 'Save Task';
   }
-  /* END OF CODE UPDATE */
 });
 
 
