@@ -3,6 +3,21 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { updateElectronApp, UpdateSourceType } = require('update-electron-app');
 const Store = require('electron-store').default;
+const Database = require('better-sqlite3')
+const dbPath = path.join(app.getPath('userData'), 'tasks.db')
+const db = new Database(dbPath)
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS tasks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'To Do',
+    priority    TEXT NOT NULL DEFAULT 'Medium',
+    notes       TEXT NOT NULL DEFAULT '',
+    createdAt   INTEGER NOT NULL,
+    updatedAt   INTEGER NOT NULL
+  )
+`)
 
 // Create a store instance for managing application settings.
 const settingsStore = new Store({
@@ -13,34 +28,10 @@ const settingsStore = new Store({
   }
 });
 
-//Initialize the store for task data.
-const taskStore = new Store({
-  name: 'tasks',
-  defaults: { tasks: [] }
-});
-
-// Timeout handle for debounced save.
-let saveTimeout = null
-// Debounced save function for task updates, to prevent excessive writes to the store.
-function debouncedSave() {
-  clearTimeout(saveTimeout)// Clear any pending save to debounce rapid updates.
-  saveTimeout = setTimeout(() => {// Save the tasks to the store after the debounce period.
-    taskStore.set('tasks', tasks)
-  }, 300)
-}
-
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
   app.quit();
 }
-
-// ── Task data — owned by main (same as v2) ────────────────────────────────────
-// const tasks = [
-//   { id: 1, title: 'Design dashboard screen', priority: 'High', status: 'In Progress', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
-//   { id: 2, title: 'Write unit tests for API', priority: 'Medium', status: 'To Do', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
-//   { id: 3, title: 'Update README documentation', priority: 'Low', status: 'Done', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
-//   { id: 4, title: 'Fix login bug', priority: 'High', status: 'To Do', createdAt: Date.now(), updatedAt: Date.now(), notes: ''},
-// ];
 
 // ── Module-scope window / tray references ─────────────────────────────────────
 // IMPORTANT: must be module-scope — a local variable would be GC'd silently.
@@ -51,15 +42,6 @@ let detailWindow = null;
 let tray = null;  // NEW in v3 — module-scope prevents the GC footgun - GC footgun is when the tray gets garbage collected if not referenced.
 let activePriorityFilter = 'All';
 let updateState = { status: 'idle' };
-
-//Load tasks from the persistent store
-let tasks = taskStore.get('tasks')
-
-// Filter out invalid tasks
-tasks = tasks.filter(t => t && typeof t.id === 'number')
-
-// nextId keeps track of the next task ID to be assigned
-let nextId = tasks.length > 0 ? Math.max(...tasks.map(t => t.id)) + 1 : 1;
 
 const validStatusFilters = new Set(['all', 'To Do', 'In Progress', 'Done']);
 
@@ -83,27 +65,36 @@ autoUpdater.on('error', error => console.error('[updater] Update check failed:',
 
 // ── Helper: push current task list to the main window ─────────────────────────
 function pushTasksToRenderer() {
+  const allTasks = db.prepare(
+    'SELECT * FROM tasks ORDER BY createdAt DESC'
+  ).all()
+
   if (mainWindow) {
-    mainWindow.webContents.send('tasks:updated', tasks);
+    mainWindow.webContents.send('tasks:updated', allTasks);
   }
 
   if (detailWindow && !detailWindow.isDestroyed()) {
-    detailWindow.webContents.send('tasks:updated', tasks);
+    detailWindow.webContents.send('tasks:updated', allTasks);
   }
-  refreshTrayUI();
+  refreshTray();
 }
 
 function getIncompleteCount() {
-  return tasks.filter(task => task.status !== 'Done').length;
+  return db.prepare(
+    "SELECT COUNT(*) AS cnt FROM tasks WHERE status != 'Done'"
+  ).get().cnt;
 }
 
-function refreshTrayUI() {
+function refreshTray() {
   if (!tray) return;
 
   tray.setToolTip(`Task Manager - ${getIncompleteCount()} incomplete`);
 
-  const hasDoneTasks = tasks.some(task => task.status === 'Done');
-  const hasIncompleteTasks = tasks.some(task => task.status !== 'Done');
+  const taskStatusCounts = db.prepare(`
+    SELECT
+      EXISTS(SELECT 1 FROM tasks WHERE status = 'Done') AS hasDoneTasks,
+      EXISTS(SELECT 1 FROM tasks WHERE status != 'Done') AS hasIncompleteTasks
+  `).get();
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -113,7 +104,7 @@ function refreshTrayUI() {
     { type: 'separator' },
     {
       label: 'Mark All Done',
-      enabled: hasIncompleteTasks,
+      enabled: Boolean(taskStatusCounts.hasIncompleteTasks),
       click: async () => {
         const confirm = await dialog.showMessageBox(mainWindow, {
           type: 'warning',
@@ -127,18 +118,16 @@ function refreshTrayUI() {
 
         if (confirm.response !== 0) return;
 
-        tasks.forEach(task => {
-          if (task.status !== 'Done') {
-            task.status = 'Done';
-            task.updatedAt = Date.now();
-          }
-        });
+        db.prepare(
+          "UPDATE tasks SET status='Done', updatedAt=? WHERE status != 'Done'"
+        ).run(Date.now());
+
         pushTasksToRenderer();
       },
     },
     {
       label: 'Clear Done Tasks',
-      enabled: hasDoneTasks,
+      enabled: Boolean(taskStatusCounts.hasDoneTasks),
       click: async () => {
         const confirm = await dialog.showMessageBox(mainWindow, {
           type: 'warning',
@@ -152,11 +141,9 @@ function refreshTrayUI() {
 
         if (confirm.response !== 0) return;
 
-        for (let i = tasks.length - 1; i >= 0; i -= 1) {
-          if (tasks[i].status === 'Done') {
-            tasks.splice(i, 1);
-          }
-        }
+        db.prepare(
+          "DELETE FROM tasks WHERE status = 'Done'"
+        ).run();
 
         pushTasksToRenderer();
       },
@@ -173,7 +160,9 @@ function refreshTrayUI() {
 // ── Carried forward from v2 ───────────────────────────────────────────────────
 
 // Return the full task list
-ipcMain.handle('tasks:get', () => tasks);
+ipcMain.handle('tasks:get', () => {
+  return db.prepare('SELECT * FROM tasks ORDER BY createdAt DESC').all()
+});
 
 ipcMain.handle('updates:get-state', () => updateState);
 ipcMain.handle('updates:install', (event) => {
@@ -247,6 +236,52 @@ function sanitiseTasks(parsed) {
   });
 }
 
+const insertTask = db.prepare(
+  'INSERT INTO tasks (id,title,status,priority,notes,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?)'
+);
+
+const insertTasks = db.transaction((records) => {
+  for (const task of records) {
+    insertTask.run(
+      task.id,
+      task.title,
+      task.status,
+      task.priority,
+      task.notes,
+      task.createdAt,
+      task.updatedAt
+    );
+  }
+});
+
+const replaceTasks = db.transaction((records) => {
+  db.prepare('DELETE FROM tasks').run();
+  insertTasks(records);
+});
+
+function migrateLegacyTasks() {
+  if (db.pragma('user_version', { simple: true }) >= 1) return;
+
+  const legacyTaskStore = new Store({
+    name: 'tasks',
+    defaults: { tasks: [] },
+  });
+  const legacyRecords = legacyTaskStore.get('tasks');
+
+  if (!Array.isArray(legacyRecords)) {
+    throw new Error('Legacy task data must be a list of tasks.');
+  }
+
+  const taskCount = db.prepare('SELECT COUNT(*) AS count FROM tasks').get().count;
+  if (taskCount === 0 && legacyRecords.length > 0) {
+    insertTasks(sanitiseTasks(legacyRecords));
+  }
+
+  db.pragma('user_version = 1');
+}
+
+migrateLegacyTasks();
+
 // Add a new task
 ipcMain.handle('tasks:add', (_event, task) => {
   // Validate the task object before adding it
@@ -261,18 +296,15 @@ ipcMain.handle('tasks:add', (_event, task) => {
 
   // Create a new task object with validated properties
   const now = Date.now();
-  const newTask = {
-    id: nextId++,
-    title: task.title,
-    priority: task.priority,
-    status: task.status,
-    notes: '',
-    createdAt: now,
-    updatedAt: now,
-  };
-  tasks.push(newTask);
-  // Save the updated task list to the persistent store
-  taskStore.set('tasks', tasks);
+
+  // Insert the new task into the database and retrieve it
+  const info = db.prepare(
+   'INSERT INTO tasks (title,status,priority,notes,createdAt,updatedAt) VALUES (?,?,?,?,?,?)'
+  ).run(task.title, task.status, task.priority, '', now, now);
+
+  // Retrieve the newly inserted task from the database
+  const newTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(info.lastInsertRowid)
+
   pushTasksToRenderer();
   return newTask;
 });
@@ -289,7 +321,8 @@ ipcMain.handle('window:close-edit', () => { if (editWindow) editWindow.close(); 
 
 // Return a single task by id (used by the edit window to pre-fill the form)
 ipcMain.handle('tasks:getOne', (_event, taskId) => {
-  return tasks.find(t => t.id === taskId) || null;
+  if (!Number.isSafeInteger(taskId) || taskId <= 0) return null;
+  return db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId) ?? null;
 });
 
 ipcMain.handle('window:open-detail', (_event, taskId) => {
@@ -298,8 +331,12 @@ ipcMain.handle('window:open-detail', (_event, taskId) => {
 
 // Gives the detail window a dedicated IPC request by task ID and returns the full object
 ipcMain.handle('tasks:getDetail', (_event, taskId) => {
-  if (!Number.isInteger(taskId) || taskId <= 0) return null;
-  return tasks.find(task => task.id === taskId) || null;
+  if (!Number.isSafeInteger(taskId) || taskId <= 0) return null;
+  const task = db.prepare(
+    'SELECT * FROM tasks WHERE id = ?'
+  ).get(taskId) ?? null;
+
+  return task;
 });
 
 // Validates in main, updates only notes and updatedAt
@@ -309,13 +346,15 @@ ipcMain.handle('tasks:updateNotes', (_event, taskId, notes) => {
     return null;
   }
 
-  const task = tasks.find(item => item.id === taskId);
+  db.prepare(
+    'UPDATE tasks SET notes=?, updatedAt=? WHERE id=?'
+  ).run(notes, Date.now(), taskId);
+
+  const task = db.prepare(
+    'SELECT * FROM tasks WHERE id = ?'
+  ).get(taskId);
+
   if (!task) return null;
-
-  task.notes = notes;
-  task.updatedAt = Date.now();
-
-  debouncedSave();
 
   pushTasksToRenderer();
   return task;
@@ -324,8 +363,9 @@ ipcMain.handle('tasks:updateNotes', (_event, taskId, notes) => {
 // Save edits to an existing task
 ipcMain.handle('tasks:update', (_event, updated) => {
   if (!updated
-    || typeof updated.title !== 'string'
     || typeof updated !== 'object'
+    || Array.isArray(updated)
+    || typeof updated.title !== 'string'
     || !Number.isInteger(updated.id)
     || updated.id <= 0
     || updated.title.trim().length === 0
@@ -336,51 +376,52 @@ ipcMain.handle('tasks:update', (_event, updated) => {
     return null;
   }
 
-  const idx = tasks.findIndex(t => t.id === updated.id);
-  if (idx === -1) return null;
-  const existingTask = tasks[idx];
-  const now = Date.now();
+  const updateResult = db.prepare(
+    'UPDATE tasks SET title=?,status=?,priority=?,updatedAt=? WHERE id=?'
+  ).run(
+    updated.title,
+    updated.status,
+    updated.priority,
+    Date.now(),
+    updated.id
+  );
+  if (updateResult.changes === 0) return null;
 
-  tasks[idx] = {
-    id: updated.id,
-    title: updated.title,
-    priority: updated.priority,
-    status: updated.status,
-    notes: existingTask.notes,
-    createdAt: existingTask.createdAt,
-    updatedAt: now
-  };
-
-  // Save the updated task list to the persistent store
-  taskStore.set('tasks', tasks);
+  const result = db.prepare(
+    'SELECT * FROM tasks WHERE id = ?'
+  ).get(updated.id);
 
   pushTasksToRenderer();
-  return tasks[idx];
+  refreshTray();
+  return result;
 });
 
 ipcMain.handle('tasks:cycleStatus', (_event, taskId) => {
-  if (!Number.isInteger(taskId) || taskId <= 0) return null;
-  const idx = tasks.findIndex(t => t.id === taskId);
-  if (idx === -1) return null;
+  if (!Number.isSafeInteger(taskId) || taskId <= 0) return null;
+  const task = db.prepare(
+    'SELECT * FROM tasks WHERE id = ?'
+  ).get(taskId)
 
-  const statusOrder = ['To Do', 'In Progress', 'Done'];
-  const currentIndex = statusOrder.indexOf(tasks[idx].status);
-  const nextIndex = (currentIndex + 1) % statusOrder.length;
-  tasks[idx].status = statusOrder[nextIndex];
-  tasks[idx].updatedAt = Date.now();
+  if (!task) return null;
 
-  if (tasks[idx].status === 'Done') {
-    new Notification({
-      title: 'Task complete',
-      body: tasks[idx].title.slice(0, 80),
-    }).show();
+  const next = VALID_STATUS[(VALID_STATUS.indexOf(task.status) + 1) % VALID_STATUS.length]
+  db.prepare(
+    'UPDATE tasks SET status=?,updatedAt=? WHERE id=?'
+  ).run(next, Date.now(), taskId);
+
+  const cycled = db.prepare(
+    'SELECT * FROM tasks WHERE id = ?'
+  ).get(taskId);
+
+  if (cycled.status === 'Done') {
+    new Notification(
+      { title: 'Task complete', body: cycled.title }
+    ).show();
   }
 
-  // Save the updated task list to the persistent store
-  taskStore.set('tasks', tasks);
-
   pushTasksToRenderer();
-  return tasks[idx];
+  refreshTray();
+  return cycled;
 });
 
 ipcMain.handle('tasks:clearAll', async () => {
@@ -396,10 +437,9 @@ ipcMain.handle('tasks:clearAll', async () => {
 
   if (result.response !== 0) return false;
 
-  tasks.splice(0, tasks.length);
-
-  // Save the updated task list to the persistent store
-  taskStore.set('tasks', tasks);
+  db.prepare(
+    'DELETE FROM tasks'
+  ).run()
 
   pushTasksToRenderer();
   return true;
@@ -407,8 +447,11 @@ ipcMain.handle('tasks:clearAll', async () => {
 
 // Delete a task — after native confirmation dialog in main
 ipcMain.handle('tasks:delete', async (_event, taskId) => {
-  if (!Number.isInteger(taskId) || taskId <= 0) return false;
-  const task = tasks.find(t => t.id === taskId);
+  if (!Number.isSafeInteger(taskId) || taskId <= 0) return false;
+  const task = db.prepare(
+    'SELECT * FROM tasks WHERE id = ?'
+  ).get(taskId);
+
   if (!task) return false;
 
   // dialog.showMessageBox runs in main (dialog module is main-process only)
@@ -424,14 +467,12 @@ ipcMain.handle('tasks:delete', async (_event, taskId) => {
 
   if (result.response !== 0) return false;   // 0 = Delete button
 
-  const idx = tasks.findIndex(t => t.id === taskId);
-  if (idx === -1) return false;
-  tasks.splice(idx, 1);
-
-  // Save the updated task list to the persistent store
-  taskStore.set('tasks', tasks);
+  db.prepare(
+    'DELETE FROM tasks WHERE id = ?'
+  ).run(taskId)
 
   pushTasksToRenderer();
+  refreshTray();
   return true;
 });
 
@@ -440,7 +481,11 @@ ipcMain.handle('tasks:delete', async (_event, taskId) => {
 // restriction). It invokes this handler; main builds the menu and calls
 // menu.popup() — different from Menu.setApplicationMenu() which replaces the
 // global menu bar.
-ipcMain.handle('menu:showTaskContext', (_event, taskId, taskTitle) => {
+ipcMain.handle('menu:showTaskContext', (_event, taskId) => {
+  if (!Number.isSafeInteger(taskId) || taskId <= 0) return false;
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
+  if (!task) return false;
+
   const menu = Menu.buildFromTemplate([
     {
       label: 'Edit Task',
@@ -448,23 +493,23 @@ ipcMain.handle('menu:showTaskContext', (_event, taskId, taskTitle) => {
     },
     { type: 'separator' },
     {
-      label: `Delete "${taskTitle}"`,
+      label: `Delete "${task.title}"`,
       click: async () => {
         const result = await dialog.showMessageBox(mainWindow, {
           type: 'warning',
           title: 'Delete Task',
-          message: `Delete "${taskTitle}"?`,
+          message: `Delete "${task.title}"?`,
           detail: 'This action cannot be undone.',
           buttons: ['Delete', 'Cancel'],
           defaultId: 1,
           cancelId: 1,
         });
         if (result.response === 0) {
-          const idx = tasks.findIndex(t => t.id === taskId);
-          if (idx !== -1) {
-            tasks.splice(idx, 1);
-            pushTasksToRenderer();
-          }
+          const result = db.prepare(
+            'DELETE FROM tasks WHERE id = ?'
+          ).run(taskId);
+
+          if (result.changes > 0) pushTasksToRenderer();
         }
       }
     },
@@ -485,12 +530,14 @@ ipcMain.handle('dialog:openFile', async () => {
   });
   if (result.canceled || result.filePaths.length === 0) return false;
   try {
-    const loaded = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'));
-    const clean = sanitiseTasks(loaded);
-    tasks.splice(0, tasks.length, ...clean);
-    nextId = Math.max(...tasks.map(t => t.id), 0) + 1;
+    const loaded = JSON.parse(
+      fs.readFileSync(result.filePaths[0], 'utf8')
+    );
+    replaceTasks(sanitiseTasks(loaded));
+
     pushTasksToRenderer();
     return true;
+
   } catch (err) {
     dialog.showMessageBox(mainWindow, {
       type: 'error', message: 'Could not read file', detail: err.message,
@@ -507,7 +554,11 @@ ipcMain.handle('dialog:saveFile', async () => {
   });
   if (result.canceled || !result.filePath) return false;
   try {
-    fs.writeFileSync(result.filePath, JSON.stringify(tasks, null, 2), 'utf8');
+    const taskRows = db.prepare(
+      'SELECT * FROM tasks ORDER BY createdAt DESC'
+    ).all();
+
+    fs.writeFileSync(result.filePath, JSON.stringify(taskRows, null, 2), 'utf8');
     return true;
   } catch (err) {
     dialog.showMessageBox(mainWindow, {
@@ -634,7 +685,7 @@ function createEditWindow(taskId) {
   editWindow.on('close', () => saveWindowSize(editWindow, 'editWindowSize'));
 
   editWindow.webContents.on('did-finish-load', () => {
-    const task = tasks.find(t => t.id === taskId);
+    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId) ?? null;
     editWindow.webContents.send('edit:loadTask', task);
   });
 
@@ -642,8 +693,11 @@ function createEditWindow(taskId) {
 }
 
 function createDetailWindow(taskId) {
-  if (!Number.isInteger(taskId) || taskId <= 0) return;
-  if (!tasks.some(task => task.id === taskId)) return;
+  const task = db.prepare(
+    'SELECT * FROM tasks WHERE id = ?'
+  ).get(taskId);
+
+  if (!task) return;
 
   const detailUrl = new URL(DETAIL_WINDOW_WEBPACK_ENTRY);
   detailUrl.searchParams.set('taskId', String(taskId));
@@ -711,11 +765,13 @@ function buildMenu() {
             });
             if (result.canceled || result.filePaths.length === 0) return;
             try {
-              const loaded = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'));
-              const clean = sanitiseTasks(loaded);
-              tasks.splice(0, tasks.length, ...clean);
-              nextId = Math.max(...tasks.map(t => t.id), 0) + 1;
+              const loaded = JSON.parse(
+                fs.readFileSync(result.filePaths[0], 'utf8')
+              );
+              replaceTasks(sanitiseTasks(loaded));
+
               pushTasksToRenderer();
+
             } catch (err) {
               dialog.showMessageBox(mainWindow, {
                 type: 'error', message: 'Could not read file', detail: err.message,
@@ -732,7 +788,12 @@ function buildMenu() {
               filters: [{ name: 'JSON Files', extensions: ['json'] }],
             });
             if (result.canceled || !result.filePath) return;
-            fs.writeFileSync(result.filePath, JSON.stringify(tasks, null, 2), 'utf8');
+
+            const taskRows = db.prepare(
+              'SELECT * FROM tasks ORDER BY createdAt DESC'
+            ).all();
+
+            fs.writeFileSync(result.filePath, JSON.stringify(taskRows, null, 2), 'utf8');
           },
         },
         { type: 'separator' },
@@ -786,7 +847,7 @@ function createTray() {
   const icon = nativeImage.createFromPath(iconPath);
 
   tray = new Tray(icon);           // assigned to module-scope let (not const!)
-  refreshTrayUI();
+  refreshTray();
 
   tray.on('double-click', () => {
     if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
@@ -831,4 +892,5 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   app.isQuitting = true;
   if (tray) tray.destroy();
+  if (db.open) db.close();
 });
