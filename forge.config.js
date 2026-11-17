@@ -41,7 +41,6 @@ module.exports = {
       name: '@electron-forge/plugin-webpack',
       config: {
         mainConfig: './webpack.main.config.js',
-        nativeModules: true, // Include native modules like better-sqlite3 at runtime
         assets: ['./assets'], // include the assets folder for the tray icon
         renderer: {
           config: './webpack.renderer.config.js',
