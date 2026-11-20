@@ -841,9 +841,9 @@ function buildMenu() {
 
 // ── NEW in v3 — Tray ──────────────────────────────────────────────────────────
 function createTray() {
-  // nativeImage.createFromPath — if the icon file doesn't exist Electron
-  // returns an empty image rather than crashing, so this is safe in dev.
-  const iconPath = path.join(process.resourcesPath, 'icon.png');
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'icon.png')
+    : path.resolve(__dirname, '..', '..', 'assets', 'icon.png');
   const icon = nativeImage.createFromPath(iconPath);
 
   tray = new Tray(icon);           // assigned to module-scope let (not const!)
