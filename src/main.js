@@ -65,9 +65,11 @@ autoUpdater.on('error', error => console.error('[updater] Update check failed:',
 
 // ── Helper: push current task list to the main window ─────────────────────────
 function pushTasksToRenderer() {
+  console.time('tasks:get');
   const allTasks = db.prepare(
     'SELECT * FROM tasks ORDER BY createdAt DESC'
   ).all()
+  console.timeEnd('tasks:get');
 
   if (mainWindow) {
     mainWindow.webContents.send('tasks:updated', allTasks);
@@ -259,29 +261,6 @@ const replaceTasks = db.transaction((records) => {
   insertTasks(records);
 });
 
-function migrateLegacyTasks() {
-  if (db.pragma('user_version', { simple: true }) >= 1) return;
-
-  const legacyTaskStore = new Store({
-    name: 'tasks',
-    defaults: { tasks: [] },
-  });
-  const legacyRecords = legacyTaskStore.get('tasks');
-
-  if (!Array.isArray(legacyRecords)) {
-    throw new Error('Legacy task data must be a list of tasks.');
-  }
-
-  const taskCount = db.prepare('SELECT COUNT(*) AS count FROM tasks').get().count;
-  if (taskCount === 0 && legacyRecords.length > 0) {
-    insertTasks(sanitiseTasks(legacyRecords));
-  }
-
-  db.pragma('user_version = 1');
-}
-
-migrateLegacyTasks();
-
 // Add a new task
 ipcMain.handle('tasks:add', (_event, task) => {
   // Validate the task object before adding it
@@ -298,9 +277,11 @@ ipcMain.handle('tasks:add', (_event, task) => {
   const now = Date.now();
 
   // Insert the new task into the database and retrieve it
+  console.time('tasks:add');
   const info = db.prepare(
    'INSERT INTO tasks (title,status,priority,notes,createdAt,updatedAt) VALUES (?,?,?,?,?,?)'
   ).run(task.title, task.status, task.priority, '', now, now);
+  console.timeEnd('tasks:add');
 
   // Retrieve the newly inserted task from the database
   const newTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(info.lastInsertRowid)

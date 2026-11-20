@@ -1,6 +1,7 @@
 import './renderer.css';
 
 const taskList  = document.getElementById('task-list')
+const taskListArea = document.querySelector('.task-list-area')
 const emptyState = document.getElementById('empty-state')
 const taskCount  = document.getElementById('task-count')
 const btnAdd     = document.getElementById('btn-add')
@@ -14,6 +15,14 @@ const updateInstall = document.getElementById('btn-update-install')
 const filterBtns = document.querySelectorAll('.filter-btn');
 
 console.log('Main window renderer loaded')
+
+const taskLayout = getComputedStyle(document.documentElement);
+const TASK_CARD_HEIGHT = parseFloat(taskLayout.getPropertyValue('--task-card-height'));
+const TASK_CARD_GAP = parseFloat(taskLayout.getPropertyValue('--task-card-gap'));
+const TASK_ROW_HEIGHT = TASK_CARD_HEIGHT + TASK_CARD_GAP;
+const TASK_OVERSCAN = 8;
+const LIST_PADDING_TOP = parseFloat(getComputedStyle(taskListArea).paddingTop);
+const LIST_PADDING_BOTTOM = parseFloat(getComputedStyle(taskListArea).paddingBottom);
 
 function renderUpdateState(state) {
   if (state?.status === 'available') {
@@ -44,6 +53,8 @@ let activeStatusFilter = 'all';
 let activePriorityFilter = 'All';
 const hoverAnimSuppressedUntil = new Map();
 const HOVER_SUPPRESS_MS = 260;
+let filteredTasks = [];
+let renderScheduled = false;
 
 // ── Render helpers ────────────────────────────────────────────────────────────
 
@@ -53,22 +64,54 @@ const STATUS_CLASS   = { 'To Do': 'status-todo', 'In Progress': 'status-progress
 function renderTasks(allTasks) {
   const sourceTasks = Array.isArray(allTasks) ? allTasks : [];
 
-  const visible = sourceTasks.filter((t) => {
+  filteredTasks = sourceTasks.filter((t) => {
     const matchesStatus = activeStatusFilter === 'all' || t.status === activeStatusFilter;
     const matchesPriority = activePriorityFilter === 'All' || t.priority === activePriorityFilter;
     return matchesStatus && matchesPriority;
   });
 
-  taskList.innerHTML = '';
-
-  if (visible.length === 0) {
-    emptyState.hidden = false;
-  } else {
-    emptyState.hidden = true;
-    visible.forEach(task => taskList.appendChild(createTaskCard(task)));
-  }
-
+  emptyState.hidden = filteredTasks.length !== 0;
   taskCount.textContent = `${sourceTasks.length} task${sourceTasks.length === 1 ? '' : 's'}`;
+  renderVisibleTasks();
+}
+
+function renderVisibleTasks() {
+  const totalListHeight = filteredTasks.length * TASK_ROW_HEIGHT - (filteredTasks.length ? TASK_CARD_GAP : 0);
+  const maxScrollTop = Math.max(
+    0,
+    LIST_PADDING_TOP + totalListHeight + LIST_PADDING_BOTTOM - taskListArea.clientHeight
+  );
+  taskListArea.scrollTop = Math.min(taskListArea.scrollTop, maxScrollTop);
+
+  const scrollOffset = Math.max(0, taskListArea.scrollTop - LIST_PADDING_TOP);
+  const firstVisibleIndex = Math.floor(scrollOffset / TASK_ROW_HEIGHT);
+  const start = Math.max(0, firstVisibleIndex - TASK_OVERSCAN);
+  const end = Math.min(
+    filteredTasks.length,
+    Math.ceil((scrollOffset + taskListArea.clientHeight) / TASK_ROW_HEIGHT) + TASK_OVERSCAN
+  );
+
+  taskList.style.paddingTop = `${start * TASK_ROW_HEIGHT}px`;
+  taskList.style.paddingBottom = `${(filteredTasks.length - end) * TASK_ROW_HEIGHT}px`;
+
+  const cards = [];
+  for (let index = start; index < end; index += 1) {
+    const card = createTaskCard(filteredTasks[index]);
+    card.setAttribute('aria-setsize', String(filteredTasks.length));
+    card.setAttribute('aria-posinset', String(index + 1));
+    cards.push(card);
+  }
+  taskList.replaceChildren(...cards);
+}
+
+function scheduleVisibleTaskRender() {
+  if (renderScheduled) return;
+
+  renderScheduled = true;
+  requestAnimationFrame(() => {
+    renderScheduled = false;
+    renderVisibleTasks();
+  });
 }
 
 async function renderLatestTasks() {
@@ -110,6 +153,9 @@ function createTaskCard(task) {
 
   return li;
 }
+
+taskListArea.addEventListener('scroll', scheduleVisibleTaskRender, { passive: true });
+new ResizeObserver(scheduleVisibleTaskRender).observe(taskListArea);
 
 function escapeHtml(str) {
   return String(str)

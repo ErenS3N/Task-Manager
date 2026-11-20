@@ -37,3 +37,11 @@
 - **Release test correction:** Confirmed the installed app is `3.0.1`, while the public `v3.0.1` tag points to a commit before the title-field selector fix. Therefore, the update delivered by that release could not contain the fix. Bumped the package version to `3.0.2`; `pnpm make` passed, and the embedded version and Squirrel asset names were verified. The fixed `v3.0.2` release is now published.
 
 - **Updater release propagation:** Confirmed the public `v3.0.2` release is stable and has the required Squirrel assets. At 21:12 UTC, `update.electronjs.org` still offered `v3.0.1` to a `3.0.0` client and returned `204` for `3.0.1`; this matches the service's default 15-minute release-cache TTL. `update-electron-app` checks every 10 minutes. After a few minutes, `v3.0.2` installed successfully and fixed the packaged title-field styling.
+
+**Profiling Questions**
+
+- **Q1 - Transaction impact:** Without `db.transaction()`, each of the 10,000 inserts commits separately, so the seed takes much longer. A separate benchmark on a temporary database measured 22.456 ms with a transaction and 16.569 s without one; these are not timings from the app's original seed run. Batching the inserts amortizes the commit and disk-sync overhead.
+
+- **Q2 - Timer output:** `console.time()` runs in the Electron main process alongside `better-sqlite3`, so its output appears in the terminal running the app. DevTools' Performance panel profiles renderer work, not the main-process SQLite query. The app terminal recorded `tasks:get` at 5.066-8.210 ms (7 samples; 6.446 ms average) and `tasks:add` at 1.999-2.231 ms (2 samples; 2.115 ms average).
+
+- **Q3 - Returning every task:** A full-table query becomes a bottleneck as the database grows because the main process must read and send every row over IPC, and the renderer must process the result. The renderer now virtualizes the visible task cards, reducing DOM work; SQL-side pagination and filtering would also reduce query and IPC costs.
